@@ -28,7 +28,7 @@ import { createShellTestAgent, PtyManager } from "./ptyManager";
 const agentSchema = z.object({
   id: z.string(),
   name: z.string(),
-  type: z.enum(["claude", "codex", "grok", "custom"]),
+  type: z.enum(["claude", "codex", "grok", "gemini", "custom"]),
   mode: z.enum(["exec", "interactive"]).optional().default("exec"),
   command: z.string(),
   args: z.array(z.string()).optional(),

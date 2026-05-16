@@ -3,7 +3,7 @@ export type AgentMode = "exec" | "interactive";
 export type Agent = {
   id: string;
   name: string;
-  type: "claude" | "codex" | "grok" | "custom";
+  type: "claude" | "codex" | "grok" | "gemini" | "custom";
   mode?: AgentMode;
   command: string;
   args?: string[];

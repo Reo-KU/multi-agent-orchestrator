@@ -20,10 +20,10 @@ type AgentRunnerEvents = {
   status: [PtyStatusEvent];
 };
 
-type CliMode = "codex" | "claude" | "grok" | "stdin-generic";
+type CliMode = "codex" | "claude" | "grok" | "gemini" | "stdin-generic";
 type CaptureStrategy = "file" | "stdout";
 
-const ALLOWED_COMMANDS = new Set(["claude", "codex", "grok", "sh", "bash", "zsh", "python", "python3", "node"]);
+const ALLOWED_COMMANDS = new Set(["claude", "codex", "grok", "gemini", "sh", "bash", "zsh", "python", "python3", "node"]);
 
 const truncate = (value: string, maxLength: number): string =>
   value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
@@ -45,6 +45,10 @@ const detectCliMode = (commandName: string): CliMode => {
 
   if (commandName === "grok") {
     return "grok";
+  }
+
+  if (commandName === "gemini") {
+    return "gemini";
   }
 
   return "stdin-generic";
@@ -78,7 +82,7 @@ const buildRunArgs = (
     };
   }
 
-  if (mode === "claude" || mode === "grok") {
+  if (mode === "claude" || mode === "grok" || mode === "gemini") {
     return {
       args: ["-p", ...flatExtraArgs, fullPrompt],
       captureStrategy: "stdout",
