@@ -19,7 +19,7 @@ export default function AgentList(): ReactElement {
   };
 
   return (
-    <aside className="min-h-0 border-r border-slate-800 bg-slate-950">
+    <aside className="flex h-full min-h-0 flex-col bg-slate-950">
       <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
         <h2 className="text-sm font-semibold">Agents</h2>
         <button
@@ -31,7 +31,7 @@ export default function AgentList(): ReactElement {
         </button>
       </div>
 
-      <div className="flex h-full min-h-0 flex-col gap-2 overflow-y-auto p-3">
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3">
         {agents.length === 0 ? (
           <p className="rounded border border-dashed border-slate-700 p-3 text-sm text-slate-400">
             No agents registered.

@@ -68,15 +68,17 @@ export default function Inspector(): ReactElement {
   };
 
   return (
-    <aside className="min-h-0 overflow-y-auto border-l border-slate-800 bg-slate-950">
+    <aside className="flex h-full min-h-0 flex-col bg-slate-950">
       <div className="border-b border-slate-800 px-4 py-3">
         <h2 className="text-sm font-semibold">Inspector</h2>
       </div>
 
       {!agent || !selectedNode ? (
-        <div className="p-4 text-sm text-slate-400">Select a node to inspect its agent.</div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 text-sm text-slate-400">
+          Select a node to inspect its agent.
+        </div>
       ) : (
-        <div className="grid gap-4 p-4">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
           <div>
             <div className="text-xs uppercase tracking-wide text-slate-500">Agent</div>
             <div className="mt-1 text-base font-semibold">{agent.name}</div>
