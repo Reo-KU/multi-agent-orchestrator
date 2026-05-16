@@ -22,6 +22,7 @@ export default function MindMapCanvas(): ReactElement {
   const selectNode = useAppStore((state) => state.selectNode);
   const updateNodePosition = useAppStore((state) => state.updateNodePosition);
   const connectNodes = useAppStore((state) => state.connectNodes);
+  const removeEdge = useAppStore((state) => state.removeEdge);
   const setRoot = useAppStore((state) => state.setRoot);
   const removeNode = useAppStore((state) => state.removeNode);
 
@@ -73,10 +74,12 @@ export default function MindMapCanvas(): ReactElement {
         edges={edges}
         nodeTypes={nodeTypes}
         fitView
+        deleteKeyCode={["Backspace", "Delete"]}
         onNodeClick={(_, node) => selectNode(node.id)}
         onPaneClick={() => selectNode(null)}
         onNodeDragStop={(_, node) => updateNodePosition(node.id, node.position)}
         onConnect={onConnect}
+        onEdgesDelete={(deleted) => deleted.forEach((edge) => void removeEdge(edge.id))}
       >
         <Background color="#334155" gap={24} />
         <Controls className="!border-slate-700 !bg-slate-900 !shadow-none [&_button]:!border-slate-700 [&_button]:!bg-slate-900 [&_button]:!fill-slate-100" />

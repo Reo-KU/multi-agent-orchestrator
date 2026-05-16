@@ -259,6 +259,7 @@ type AppState = {
   updateNodePosition: (nodeId: string, position: GraphNode["position"]) => void;
   removeNode: (nodeId: string) => Promise<void>;
   connectNodes: (source: string, target: string) => Promise<void>;
+  removeEdge: (edgeId: string) => Promise<void>;
   setRoot: (nodeId: string) => Promise<void>;
   selectNode: (nodeId: string | null) => void;
   appendLog: (agentId: string, data: string) => void;
@@ -430,6 +431,13 @@ export const useAppStore = create<AppState>((set, get) => ({
         edges: [...state.edges, { id: `edge_${source}_${target}_${Date.now()}`, source, target }]
       };
     });
+    saveGraphDebounced({ nodes: get().nodes, edges: get().edges });
+  },
+
+  removeEdge: async (edgeId) => {
+    set((state) => ({
+      edges: state.edges.filter((edge) => edge.id !== edgeId)
+    }));
     saveGraphDebounced({ nodes: get().nodes, edges: get().edges });
   },
 
