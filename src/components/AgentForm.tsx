@@ -112,6 +112,7 @@ export default function AgentForm({ agent, onClose }: AgentFormProps): ReactElem
               <option value="claude">claude</option>
               <option value="codex">codex</option>
               <option value="grok">grok</option>
+              <option value="gemini">gemini</option>
               <option value="custom">custom</option>
             </select>
           </label>
