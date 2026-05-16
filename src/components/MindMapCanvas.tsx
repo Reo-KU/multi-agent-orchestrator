@@ -67,7 +67,7 @@ export default function MindMapCanvas(): ReactElement {
   };
 
   return (
-    <section className="min-w-0 bg-slate-900">
+    <section className="flex min-h-0 min-w-0 flex-1 bg-slate-900">
       <ReactFlow
         nodes={nodes}
         edges={edges}

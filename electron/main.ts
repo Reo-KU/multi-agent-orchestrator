@@ -381,6 +381,7 @@ const createWindow = (): void => {
 
   if (process.env.ELECTRON_RENDERER_URL) {
     void window.loadURL(process.env.ELECTRON_RENDERER_URL);
+    window.webContents.openDevTools({ mode: "detach" });
   } else {
     void window.loadFile(join(__dirname, "../renderer/index.html"));
   }
