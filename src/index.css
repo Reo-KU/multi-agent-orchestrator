@@ -5,3 +5,35 @@
 body {
   margin: 0;
 }
+
+@keyframes mao-pulse-running {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 7px rgba(34, 211, 238, 0);
+  }
+}
+
+@keyframes mao-pulse-starting {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(234, 179, 8, 0);
+  }
+}
+
+.mao-node-running {
+  animation: mao-pulse-running 1.4s ease-in-out infinite;
+}
+
+.mao-node-starting {
+  animation: mao-pulse-starting 1.4s ease-in-out infinite;
+}
+
+.mao-node-error {
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.9);
+}

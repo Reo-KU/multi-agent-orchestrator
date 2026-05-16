@@ -2,20 +2,34 @@ import { app, BrowserWindow, ipcMain } from "electron";
 import fs from "fs-extra";
 import { join } from "node:path";
 import { z } from "zod";
-import type { Agent, GraphEdge, GraphNode, IpcChannels, Task } from "../src/types";
+import type {
+  Agent,
+  AgentHistoryEntry,
+  AgentRunRequest,
+  AgentRunResult,
+  AgentSummary,
+  GraphEdge,
+  GraphNode,
+  IpcChannels,
+  Task
+} from "../src/types";
 import {
+  AGENT_HISTORY_PATH,
   AGENTS_JSON_PATH,
   GRAPH_JSON_PATH,
+  PROJECT_SUMMARY_PATH,
   TASKS_JSON_PATH,
   WORKSPACE_ROOT
 } from "../src/utils/storage";
 import { maskSecrets } from "../src/utils/maskSecrets";
+import { AgentRunner } from "./agentRunner";
 import { createShellTestAgent, PtyManager } from "./ptyManager";
 
 const agentSchema = z.object({
   id: z.string(),
   name: z.string(),
   type: z.enum(["claude", "codex", "grok", "custom"]),
+  mode: z.enum(["exec", "interactive"]).optional().default("exec"),
   command: z.string(),
   args: z.array(z.string()).optional(),
   workingDirectory: z.string(),
@@ -59,6 +73,7 @@ const agentsSchema = z.array(agentSchema);
 const tasksSchema = z.array(taskSchema);
 
 const ptyManager = new PtyManager();
+const agentRunner = new AgentRunner();
 let didRunSmokeTest = false;
 const writeLocks = new Map<string, Promise<void>>();
 
@@ -111,6 +126,15 @@ const initializeStorage = async (): Promise<void> => {
   await ensureJsonFile(AGENTS_JSON_PATH, []);
   await ensureJsonFile(GRAPH_JSON_PATH, { nodes: [], edges: [] });
   await ensureJsonFile(TASKS_JSON_PATH, []);
+  await ensureJsonFile(AGENT_HISTORY_PATH, {});
+
+  if (!(await fs.pathExists(PROJECT_SUMMARY_PATH))) {
+    await fs.writeFile(
+      PROJECT_SUMMARY_PATH,
+      "# Project Summary\n\n(ここに workspace の概要を書く。各エージェントの prompt 先頭に注入される)\n",
+      "utf8"
+    );
+  }
 
   await readValidatedJson(AGENTS_JSON_PATH, agentsSchema, []);
   await readValidatedJson(GRAPH_JSON_PATH, graphSchema, { nodes: [], edges: [] });
@@ -158,6 +182,82 @@ const registerIpcHandlers = (): void => {
         );
       });
       ptyManager.kill(id);
+    }
+  );
+
+  ipcMain.handle(
+    "mao:agent:run" satisfies keyof IpcChannels,
+    async (_event, request: AgentRunRequest): ReturnType<IpcChannels["mao:agent:run"]> => {
+      const agents = await readAgents();
+      const agent = agents.find((item) => item.id === request.agentId);
+
+      if (!agent) {
+        return { ok: false, error: `Agent not found: ${request.agentId}` } satisfies AgentRunResult;
+      }
+
+      if ((agent.mode ?? "exec") !== "exec") {
+        return { ok: false, error: `Agent mode is not 'exec': ${agent.mode}` } satisfies AgentRunResult;
+      }
+
+      return agentRunner.run(request, agent);
+    }
+  );
+
+  ipcMain.handle(
+    "mao:agent:loadSummary" satisfies keyof IpcChannels,
+    async (_event, agentId: string): ReturnType<IpcChannels["mao:agent:loadSummary"]> => {
+      try {
+        const history = (await fs.readJson(AGENT_HISTORY_PATH)) as Record<string, AgentHistoryEntry[]>;
+        const list = history[agentId] ?? [];
+        return {
+          agentId,
+          totalRuns: list.length,
+          recentEntries: list.slice(-10)
+        } satisfies AgentSummary;
+      } catch {
+        return null;
+      }
+    }
+  );
+
+  ipcMain.handle(
+    "mao:agent:appendHistory" satisfies keyof IpcChannels,
+    async (
+      _event,
+      agentId: string,
+      entry: AgentHistoryEntry
+    ): ReturnType<IpcChannels["mao:agent:appendHistory"]> => {
+      await withFileLock(AGENT_HISTORY_PATH, async () => {
+        let history: Record<string, AgentHistoryEntry[]> = {};
+
+        try {
+          history = (await fs.readJson(AGENT_HISTORY_PATH)) as Record<string, AgentHistoryEntry[]>;
+        } catch {
+          history = {};
+        }
+
+        history[agentId] = [...(history[agentId] ?? []), entry].slice(-50);
+        await writeJsonUnlocked(AGENT_HISTORY_PATH, history);
+      });
+    }
+  );
+
+  ipcMain.handle(
+    "mao:project:loadSummary" satisfies keyof IpcChannels,
+    async (): ReturnType<IpcChannels["mao:project:loadSummary"]> => {
+      try {
+        return await fs.readFile(PROJECT_SUMMARY_PATH, "utf8");
+      } catch {
+        return "";
+      }
+    }
+  );
+
+  ipcMain.handle(
+    "mao:project:saveSummary" satisfies keyof IpcChannels,
+    async (_event, text: string): ReturnType<IpcChannels["mao:project:saveSummary"]> => {
+      await fs.ensureDir(WORKSPACE_ROOT);
+      await fs.writeFile(PROJECT_SUMMARY_PATH, text, "utf8");
     }
   );
 
@@ -251,6 +351,20 @@ const registerPtyBroadcasts = (): void => {
       browserWindow.webContents.send("mao:pty:status", { agentId, status });
     }
   });
+
+  agentRunner.on("data", ({ agentId, data }) => {
+    const maskedData = maskSecrets(data);
+
+    for (const browserWindow of BrowserWindow.getAllWindows()) {
+      browserWindow.webContents.send("mao:pty:data", { agentId, data: maskedData });
+    }
+  });
+
+  agentRunner.on("status", ({ agentId, status }) => {
+    for (const browserWindow of BrowserWindow.getAllWindows()) {
+      browserWindow.webContents.send("mao:pty:status", { agentId, status });
+    }
+  });
 };
 
 const createWindow = (): void => {
@@ -258,9 +372,10 @@ const createWindow = (): void => {
     width: 1200,
     height: 800,
     webPreferences: {
-      preload: join(__dirname, "../preload/preload.js"),
+      preload: join(__dirname, "../preload/preload.mjs"),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      sandbox: false
     }
   });
 

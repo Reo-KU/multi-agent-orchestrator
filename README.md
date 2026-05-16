@@ -46,6 +46,12 @@ Workspace JSON paths are defined in `src/utils/storage.ts` and point to:
 ~/.multi-agent-orchestrator/workspaces/default/
 ```
 
+## UI Walkthrough
+
+- Project Summary: 左上の "Project Summary" ボタンから、プロジェクト全体の前提や方針を Markdown テキストとして編集できます。
+- Agent History: Inspector の "直近の応答履歴" で、選択中エージェントの最近の入力、応答、dispatch 数を確認できます。
+- Node glow: マインドマップ上のノードは状態に応じて光ります。starting は黄色、running はシアン、error は赤です。
+
 ## Troubleshooting
 
 ### node-pty: spawn-helper permission error

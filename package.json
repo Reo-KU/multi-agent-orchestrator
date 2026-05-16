@@ -2,18 +2,19 @@
   "name": "multi-agent-orchestrator",
   "version": "0.1.0",
   "description": "Multi-Agent CLI Orchestrator MVP",
+  "author": "komaireo",
   "main": "out/main/main.js",
   "type": "module",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "tsc --noEmit && electron-vite build",
     "dist": "npm run build && electron-builder",
-    "postinstall": "electron-builder install-app-deps"
+    "postinstall": "electron-builder install-app-deps",
+    "repair:arch": "npm install --save-optional --force --cpu=arm64 --os=darwin @rollup/rollup-darwin-arm64@4.60.4 @esbuild/darwin-arm64@0.25.12 && cp -f node_modules/node-pty/prebuilds/darwin-arm64/spawn-helper node_modules/node-pty/build/Release/spawn-helper && cp -f node_modules/node-pty/prebuilds/darwin-arm64/pty.node node_modules/node-pty/build/Release/pty.node && chmod +x node_modules/node-pty/build/Release/spawn-helper && echo 'arm64 binaries restored'"
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
-    "electron": "^42.1.0",
     "fs-extra": "^11.3.5",
     "node-pty": "^1.1.0",
     "react": "^19.2.6",
@@ -27,6 +28,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "autoprefixer": "^10.5.0",
+    "electron": "^42.1.0",
     "electron-builder": "^26.8.1",
     "electron-vite": "^5.0.0",
     "eslint": "^10.4.0",
@@ -58,9 +60,9 @@
     }
   },
   "optionalDependencies": {
-    "@esbuild/darwin-arm64": "0.25.12",
+    "@esbuild/darwin-arm64": "^0.25.12",
     "@esbuild/darwin-x64": "0.25.12",
-    "@rollup/rollup-darwin-arm64": "4.60.4",
+    "@rollup/rollup-darwin-arm64": "^4.60.4",
     "@rollup/rollup-darwin-x64": "4.60.4"
   }
 }

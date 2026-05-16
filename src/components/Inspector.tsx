@@ -1,5 +1,6 @@
-import { useState, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import { useAppStore } from "../store/useAppStore";
+import type { AgentSummary } from "../types";
 import AgentForm from "./AgentForm";
 
 export default function Inspector(): ReactElement {
@@ -9,11 +10,38 @@ export default function Inspector(): ReactElement {
   const setRoot = useAppStore((state) => state.setRoot);
   const startAgent = useAppStore((state) => state.startAgent);
   const stopAgent = useAppStore((state) => state.stopAgent);
+  const updateAgent = useAppStore((state) => state.updateAgent);
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [summary, setSummary] = useState<AgentSummary | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
 
   const selectedNode = nodes.find((node) => node.id === selectedNodeId);
   const agent = agents.find((item) => item.id === selectedNode?.agentId);
+  const agentMode = agent?.mode ?? "exec";
+
+  const loadSummary = async (agentId: string): Promise<void> => {
+    setSummaryLoading(true);
+    setSummaryError(null);
+    try {
+      setSummary(await window.mao.agent.loadSummary(agentId));
+    } catch (caught) {
+      setSummaryError(caught instanceof Error ? caught.message : "Failed to load agent history.");
+      setSummary(null);
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!agent) {
+      setSummary(null);
+      return;
+    }
+
+    void loadSummary(agent.id);
+  }, [agent?.id]);
 
   const start = async (): Promise<void> => {
     if (!agent) {
@@ -56,6 +84,19 @@ export default function Inspector(): ReactElement {
           </div>
 
           <Info label="Status" value={agent.status} />
+          <label className="grid gap-1 text-sm">
+            <span className="text-xs uppercase tracking-wide text-slate-500">Mode</span>
+            <select
+              value={agentMode}
+              onChange={(event) => {
+                void updateAgent({ ...agent, mode: event.target.value as "exec" | "interactive" });
+              }}
+              className="rounded border border-slate-700 bg-slate-900 px-3 py-2 outline-none focus:border-cyan-500"
+            >
+              <option value="exec">Exec (recommended)</option>
+              <option value="interactive">Interactive (legacy)</option>
+            </select>
+          </label>
           <Info label="Command" value={[agent.command, ...(agent.args ?? [])].join(" ")} />
           <Info label="Working Directory" value={agent.workingDirectory || "-"} />
           <Info label="Role" value={agent.role || "-"} />
@@ -67,14 +108,18 @@ export default function Inspector(): ReactElement {
             <button
               type="button"
               onClick={() => void start()}
-              className="rounded bg-green-500 px-3 py-2 text-sm font-medium text-green-950 hover:bg-green-400"
+              disabled={agentMode === "exec"}
+              title={agentMode === "exec" ? "exec mode は task 実行時に自動 spawn します" : undefined}
+              className="rounded bg-green-500 px-3 py-2 text-sm font-medium text-green-950 hover:bg-green-400 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Start
             </button>
             <button
               type="button"
               onClick={() => void stop()}
-              className="rounded bg-red-500 px-3 py-2 text-sm font-medium text-red-950 hover:bg-red-400"
+              disabled={agentMode === "exec"}
+              title={agentMode === "exec" ? "exec mode は task 実行時に自動 spawn します" : undefined}
+              className="rounded bg-red-500 px-3 py-2 text-sm font-medium text-red-950 hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Stop
             </button>
@@ -93,12 +138,90 @@ export default function Inspector(): ReactElement {
               Edit
             </button>
           </div>
+
+          <div className="border-t border-slate-800 pt-4">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold">直近の応答履歴</h3>
+              <button
+                type="button"
+                onClick={() => void loadSummary(agent.id)}
+                className="rounded border border-slate-700 px-2 py-1 text-xs hover:bg-slate-800"
+              >
+                Refresh
+              </button>
+            </div>
+            <AgentHistoryView
+              summary={summary}
+              loading={summaryLoading}
+              error={summaryError}
+            />
+          </div>
         </div>
       )}
 
       {editing && agent ? <AgentForm agent={agent} onClose={() => setEditing(false)} /> : null}
     </aside>
   );
+}
+
+function AgentHistoryView({
+  summary,
+  loading,
+  error
+}: {
+  summary: AgentSummary | null;
+  loading: boolean;
+  error: string | null;
+}): ReactElement {
+  if (loading) {
+    return <p className="text-sm text-slate-400">Loading...</p>;
+  }
+
+  if (error) {
+    return <p className="rounded border border-red-900/70 bg-red-950/30 p-2 text-sm text-red-200">{error}</p>;
+  }
+
+  const entries = summary?.recentEntries.slice(0, 5) ?? [];
+  if (entries.length === 0) {
+    return <p className="text-sm text-slate-500">履歴なし</p>;
+  }
+
+  return (
+    <div className="grid gap-2">
+      {entries.map((entry) => (
+        <div
+          key={`${entry.taskId}-${entry.at}`}
+          className="rounded border border-slate-800 bg-slate-900/60 p-3"
+        >
+          <div className="mb-2 flex items-center justify-between gap-2 text-xs text-slate-400">
+            <span>{formatTime(entry.at)} · task:{entry.taskId.slice(-6)}</span>
+            <span className="rounded bg-slate-800 px-2 py-0.5 text-slate-300">
+              → {entry.emittedDispatches.length} dispatch
+            </span>
+          </div>
+          <div className="truncate text-xs text-slate-300" title={entry.receivedBody}>
+            {entry.receivedBody || "(empty input)"}
+          </div>
+          <pre className="mt-2 max-h-20 overflow-auto whitespace-pre-wrap text-xs text-slate-400">
+            {entry.responseLastMessage || "(no response)"}
+          </pre>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function formatTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
 }
 
 function Info({

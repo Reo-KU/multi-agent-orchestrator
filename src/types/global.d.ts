@@ -1,10 +1,28 @@
-import type { Agent, GraphEdge, GraphNode, PtyDataEvent, PtyStatusEvent, Task } from "./index";
+import type {
+  Agent,
+  AgentHistoryEntry,
+  AgentRunRequest,
+  AgentRunResult,
+  AgentSummary,
+  GraphEdge,
+  GraphNode,
+  PtyDataEvent,
+  PtyStatusEvent,
+  Task
+} from "./index";
 
 type MaoApi = {
   agent: {
     list: () => Promise<Agent[]>;
     save: (agent: Agent) => Promise<Agent>;
     delete: (id: string) => Promise<void>;
+    run: (request: AgentRunRequest) => Promise<AgentRunResult>;
+    loadSummary: (agentId: string) => Promise<AgentSummary | null>;
+    appendHistory: (agentId: string, entry: AgentHistoryEntry) => Promise<void>;
+  };
+  project: {
+    loadSummary: () => Promise<string>;
+    saveSummary: (text: string) => Promise<void>;
   };
   graph: {
     load: () => Promise<{ nodes: GraphNode[]; edges: GraphEdge[] }>;

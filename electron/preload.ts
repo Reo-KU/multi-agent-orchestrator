@@ -1,11 +1,31 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { Agent, GraphEdge, GraphNode, PtyDataEvent, PtyStatusEvent, Task } from "../src/types";
+import type {
+  Agent,
+  AgentHistoryEntry,
+  AgentRunRequest,
+  AgentRunResult,
+  AgentSummary,
+  GraphEdge,
+  GraphNode,
+  PtyDataEvent,
+  PtyStatusEvent,
+  Task
+} from "../src/types";
 
 contextBridge.exposeInMainWorld("mao", {
   agent: {
     list: (): Promise<Agent[]> => ipcRenderer.invoke("mao:agent:list"),
     save: (agent: Agent): Promise<Agent> => ipcRenderer.invoke("mao:agent:save", agent),
-    delete: (id: string): Promise<void> => ipcRenderer.invoke("mao:agent:delete", id)
+    delete: (id: string): Promise<void> => ipcRenderer.invoke("mao:agent:delete", id),
+    run: (request: AgentRunRequest): Promise<AgentRunResult> => ipcRenderer.invoke("mao:agent:run", request),
+    loadSummary: (agentId: string): Promise<AgentSummary | null> =>
+      ipcRenderer.invoke("mao:agent:loadSummary", agentId),
+    appendHistory: (agentId: string, entry: AgentHistoryEntry): Promise<void> =>
+      ipcRenderer.invoke("mao:agent:appendHistory", agentId, entry)
+  },
+  project: {
+    loadSummary: (): Promise<string> => ipcRenderer.invoke("mao:project:loadSummary"),
+    saveSummary: (text: string): Promise<void> => ipcRenderer.invoke("mao:project:saveSummary", text)
   },
   graph: {
     load: (): Promise<{ nodes: GraphNode[]; edges: GraphEdge[] }> => ipcRenderer.invoke("mao:graph:load"),

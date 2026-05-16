@@ -1,0 +1,219 @@
+import { randomBytes } from "node:crypto";
+import { EventEmitter } from "node:events";
+import { tmpdir } from "node:os";
+import path, { join } from "node:path";
+import fs from "fs-extra";
+import * as pty from "node-pty";
+import type {
+  Agent,
+  AgentRunRequest,
+  AgentRunResult,
+  ContextSnapshot,
+  GraphSnapshotForContext,
+  PtyDataEvent,
+  PtyStatusEvent
+} from "../src/types";
+
+type AgentRunnerEvents = {
+  data: [PtyDataEvent];
+  status: [PtyStatusEvent];
+};
+
+const ALLOWED_COMMANDS = new Set(["claude", "codex", "grok", "sh", "bash", "zsh", "python", "python3", "node"]);
+
+const truncate = (value: string, maxLength: number): string =>
+  value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
+
+const getCommandName = (command: string): string => {
+  const normalized = command.trim();
+  const parts = normalized.split(/[\\/]/);
+  return parts[parts.length - 1] ?? normalized;
+};
+
+const buildGraphIntro = (agent: Agent, graph: GraphSnapshotForContext): string => {
+  const ownNode = graph.nodes.find((node) => node.agentId === agent.id);
+  if (!ownNode) {
+    return "";
+  }
+
+  const nodeByAgentId = new Map(graph.nodes.map((node) => [node.agentId, node]));
+  const childrenByAgentId = new Map<string, string[]>();
+  for (const edge of graph.edges) {
+    const children = childrenByAgentId.get(edge.source) ?? [];
+    children.push(edge.target);
+    childrenByAgentId.set(edge.source, children);
+  }
+
+  const renderTree = (agentId: string, depth = 0, seen = new Set<string>()): string[] => {
+    const node = nodeByAgentId.get(agentId);
+    if (!node || seen.has(agentId)) {
+      return [];
+    }
+
+    const nextSeen = new Set(seen);
+    nextSeen.add(agentId);
+    const indent = "  ".repeat(depth);
+    const lines = [`${indent}- ${node.name} (${node.role || "role unset"})${node.isRoot ? " [root]" : ""}`];
+
+    for (const childId of childrenByAgentId.get(agentId) ?? []) {
+      lines.push(...renderTree(childId, depth + 1, nextSeen));
+    }
+
+    return lines;
+  };
+
+  const directChildren = (childrenByAgentId.get(agent.id) ?? [])
+    .map((childId) => nodeByAgentId.get(childId))
+    .filter((node): node is NonNullable<typeof node> => Boolean(node));
+
+  const lines = [
+    "## MAO グラフ上のあなたの位置",
+    `あなたは ${ownNode.name} です。役割: ${ownNode.role || agent.role || "未設定"}`,
+    "",
+    "### あなた以下の子孫ツリー",
+    ...renderTree(agent.id),
+    "",
+    "### 直接の子エージェント",
+    directChildren.length > 0
+      ? directChildren.map((child) => `- ${child.name}: ${child.role || "role unset"}`).join("\n")
+      : "- なし",
+    "",
+    "子エージェントへ配送する場合は、stdout に [TO: <エージェント名>] の形式で出力してください。"
+  ];
+
+  return lines.join("\n");
+};
+
+const composePrompt = (agent: Agent, body: string, ctx: ContextSnapshot): string => {
+  const sections: string[] = [];
+  const ownNode = ctx.graph.nodes.find((node) => node.agentId === agent.id);
+
+  if (ownNode) {
+    sections.push(buildGraphIntro(agent, ctx.graph));
+  }
+
+  if (ctx.projectSummary.trim().length > 0) {
+    sections.push(`## プロジェクト情報\n${ctx.projectSummary.trim()}`);
+  }
+
+  if (ctx.agentSummary && ctx.agentSummary.recentEntries.length > 0) {
+    const lines = ["## あなたの直近の応答履歴"];
+    for (const entry of ctx.agentSummary.recentEntries.slice(-5)) {
+      lines.push(
+        `- task ${entry.taskId.slice(-6)}: 受信="${truncate(entry.receivedBody, 60)}" 応答="${truncate(
+          entry.responseLastMessage,
+          60
+        )}"`
+      );
+    }
+    sections.push(lines.join("\n"));
+  }
+
+  if (ctx.taskState) {
+    const lines = [
+      "## 現在のタスク文脈",
+      `- タスクID: ${ctx.taskState.taskId}`,
+      `- タイトル: ${ctx.taskState.title}`,
+      `- 当初指示 (ユーザーから): ${truncate(ctx.taskState.originalBody, 200)}`
+    ];
+
+    if (ctx.taskState.dispatchHistory.length > 0) {
+      lines.push("- これまでの分配:");
+      for (const dispatch of ctx.taskState.dispatchHistory) {
+        const fromName = ctx.graph.nodes.find((node) => node.agentId === dispatch.from)?.name ?? dispatch.from;
+        const toName = ctx.graph.nodes.find((node) => node.agentId === dispatch.to)?.name ?? dispatch.to;
+        lines.push(`  - ${fromName} -> ${toName}: ${truncate(dispatch.body, 100)}`);
+      }
+    }
+
+    sections.push(lines.join("\n"));
+  }
+
+  sections.push("## 受信した指示");
+  sections.push(body);
+  sections.push("");
+  sections.push("## 応答ルール");
+  sections.push("- 子エージェントへ転送する場合のみ [TO: <名前>]\\n<本文> 形式で出力");
+  sections.push("- 末端タスクの場合は最小限の出力 (1単語〜1文)");
+  sections.push("- codex 内部の Spawn / Codex Apps / MCP 機能は使わない");
+  sections.push("- 「ツールがない」と言わない。stdout に [TO:] を出すこと自体が配送");
+
+  return sections.join("\n\n");
+};
+
+export declare interface AgentRunner {
+  on<K extends keyof AgentRunnerEvents>(eventName: K, listener: (...args: AgentRunnerEvents[K]) => void): this;
+  off<K extends keyof AgentRunnerEvents>(eventName: K, listener: (...args: AgentRunnerEvents[K]) => void): this;
+  emit<K extends keyof AgentRunnerEvents>(eventName: K, ...args: AgentRunnerEvents[K]): boolean;
+}
+
+export class AgentRunner extends EventEmitter {
+  async run(req: AgentRunRequest, agent: Agent): Promise<AgentRunResult> {
+    const commandName = getCommandName(agent.command ?? "");
+    if (!ALLOWED_COMMANDS.has(commandName)) {
+      return { ok: false, error: `Command not in allowlist: ${commandName}` };
+    }
+
+    const workingDirectory = path.resolve(agent.workingDirectory);
+    if (!(await fs.pathExists(workingDirectory))) {
+      return { ok: false, error: `workingDirectory does not exist: ${workingDirectory}` };
+    }
+
+    const tmpFile = join(tmpdir(), `mao_agent_${agent.id}_${randomBytes(6).toString("hex")}.txt`);
+    const fullPrompt = composePrompt(agent, req.body, req.context);
+    const args = [
+      "exec",
+      "--skip-git-repo-check",
+      "--ephemeral",
+      "-C",
+      workingDirectory,
+      "--output-last-message",
+      tmpFile,
+      fullPrompt
+    ];
+
+    this.emit("status", { agentId: agent.id, status: "running" });
+
+    const startedAt = Date.now();
+    return new Promise<AgentRunResult>((resolve) => {
+      let proc: pty.IPty;
+
+      try {
+        proc = pty.spawn(agent.command, args, {
+          cwd: workingDirectory,
+          env: process.env as Record<string, string>,
+          cols: 140,
+          rows: 40
+        });
+      } catch (error) {
+        this.emit("status", { agentId: agent.id, status: "error" });
+        resolve({ ok: false, error: error instanceof Error ? error.message : String(error) });
+        return;
+      }
+
+      proc.onData((data) => {
+        this.emit("data", { agentId: agent.id, data });
+      });
+
+      proc.onExit(async ({ exitCode }) => {
+        const elapsedMs = Date.now() - startedAt;
+        let lastMessage = "";
+
+        try {
+          lastMessage = await fs.readFile(tmpFile, "utf8");
+        } catch {
+          lastMessage = "";
+        }
+
+        try {
+          await fs.remove(tmpFile);
+        } catch {
+          // Best effort cleanup.
+        }
+
+        this.emit("status", { agentId: agent.id, status: exitCode === 0 ? "stopped" : "error" });
+        resolve({ ok: true, lastMessage, exitCode, elapsedMs });
+      });
+    });
+  }
+}

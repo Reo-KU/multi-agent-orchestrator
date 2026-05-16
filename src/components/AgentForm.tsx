@@ -14,6 +14,7 @@ const emptyAgent = (): Agent => ({
   id: createId(),
   name: "",
   type: "custom",
+  mode: "exec",
   command: "",
   args: [],
   workingDirectory: "",
@@ -47,6 +48,7 @@ export default function AgentForm({ agent, onClose }: AgentFormProps): ReactElem
     const payload: Agent = {
       ...draft,
       name: draft.name.trim(),
+      mode: draft.mode ?? "exec",
       command: draft.command.trim(),
       args: argsText
         .split(/\n|,/)
@@ -111,6 +113,18 @@ export default function AgentForm({ agent, onClose }: AgentFormProps): ReactElem
               <option value="codex">codex</option>
               <option value="grok">grok</option>
               <option value="custom">custom</option>
+            </select>
+          </label>
+
+          <label className="grid gap-1 text-sm">
+            <span className="text-slate-300">Mode</span>
+            <select
+              value={draft.mode ?? "exec"}
+              onChange={(event) => update("mode", event.target.value as Agent["mode"])}
+              className="rounded border border-slate-700 bg-slate-950 px-3 py-2 outline-none focus:border-cyan-500"
+            >
+              <option value="exec">exec</option>
+              <option value="interactive">interactive</option>
             </select>
           </label>
 
