@@ -1,4 +1,5 @@
 import type { Agent } from "../types";
+import { stripAnsi } from "./stripAnsi";
 
 export type ToBlock = {
   agentName: string;
@@ -7,19 +8,6 @@ export type ToBlock = {
 };
 
 const toComparable = (value: string): string => value.trim().toLowerCase();
-
-const stripAnsi = (input: string): string =>
-  input
-    // CSI sequences: ESC [ params intermediate-bytes final-byte
-    .replace(/\x1b\[[0-9;?]*[\x20-\x2F]*[\x40-\x7E]/g, "")
-    // OSC sequences: ESC ] ... BEL or ESC \
-    .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, "")
-    // 2-char ESC sequences (ESC ( B, ESC =, ESC >, etc.)
-    .replace(/\x1b[()=><][\x20-\x7E]?/g, "")
-    // DCS / APC / PM / SOS: ESC P ... ESC \ etc.
-    .replace(/\x1b[PX^_][^\x1b]*\x1b\\/g, "")
-    // Remaining standalone ESC bytes.
-    .replace(/\x1b/g, "");
 
 const resolveAgentId = (name: string, agents: Agent[]): string | null => {
   const target = toComparable(name);

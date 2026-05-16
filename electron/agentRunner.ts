@@ -13,11 +13,15 @@ import type {
   PtyDataEvent,
   PtyStatusEvent
 } from "../src/types";
+import { stripAnsi } from "../src/utils/stripAnsi";
 
 type AgentRunnerEvents = {
   data: [PtyDataEvent];
   status: [PtyStatusEvent];
 };
+
+type CliMode = "codex" | "claude" | "grok" | "stdin-generic";
+type CaptureStrategy = "file" | "stdout";
 
 const ALLOWED_COMMANDS = new Set(["claude", "codex", "grok", "sh", "bash", "zsh", "python", "python3", "node"]);
 
@@ -28,6 +32,65 @@ const getCommandName = (command: string): string => {
   const normalized = command.trim();
   const parts = normalized.split(/[\\/]/);
   return parts[parts.length - 1] ?? normalized;
+};
+
+const detectCliMode = (commandName: string): CliMode => {
+  if (commandName === "codex") {
+    return "codex";
+  }
+
+  if (commandName === "claude") {
+    return "claude";
+  }
+
+  if (commandName === "grok") {
+    return "grok";
+  }
+
+  return "stdin-generic";
+};
+
+const flattenExtraArgs = (args: string[] | undefined): string[] =>
+  (args ?? []).flatMap((arg) => arg.split(/\s+/)).filter((arg) => arg.length > 0);
+
+const buildRunArgs = (
+  mode: CliMode,
+  workingDirectory: string,
+  tmpFile: string,
+  fullPrompt: string,
+  flatExtraArgs: string[]
+): { args: string[]; captureStrategy: CaptureStrategy; writePromptToStdin: boolean } => {
+  if (mode === "codex") {
+    return {
+      args: [
+        "exec",
+        "--skip-git-repo-check",
+        "--ephemeral",
+        "-C",
+        workingDirectory,
+        "--output-last-message",
+        tmpFile,
+        ...flatExtraArgs,
+        fullPrompt
+      ],
+      captureStrategy: "file",
+      writePromptToStdin: false
+    };
+  }
+
+  if (mode === "claude" || mode === "grok") {
+    return {
+      args: ["-p", ...flatExtraArgs, fullPrompt],
+      captureStrategy: "stdout",
+      writePromptToStdin: false
+    };
+  }
+
+  return {
+    args: flatExtraArgs,
+    captureStrategy: "stdout",
+    writePromptToStdin: true
+  };
 };
 
 const buildGraphIntro = (agent: Agent, graph: GraphSnapshotForContext): string => {
@@ -161,22 +224,22 @@ export class AgentRunner extends EventEmitter {
 
     const tmpFile = join(tmpdir(), `mao_agent_${agent.id}_${randomBytes(6).toString("hex")}.txt`);
     const fullPrompt = composePrompt(agent, req.body, req.context);
-    const args = [
-      "exec",
-      "--skip-git-repo-check",
-      "--ephemeral",
-      "-C",
+    const mode = detectCliMode(commandName);
+    const flatExtraArgs = flattenExtraArgs(agent.args);
+    const { args, captureStrategy, writePromptToStdin } = buildRunArgs(
+      mode,
       workingDirectory,
-      "--output-last-message",
       tmpFile,
-      fullPrompt
-    ];
+      fullPrompt,
+      flatExtraArgs
+    );
 
     this.emit("status", { agentId: agent.id, status: "running" });
 
     const startedAt = Date.now();
     return new Promise<AgentRunResult>((resolve) => {
       let proc: pty.IPty;
+      let stdoutBuffer = "";
 
       try {
         proc = pty.spawn(agent.command, args, {
@@ -185,6 +248,10 @@ export class AgentRunner extends EventEmitter {
           cols: 140,
           rows: 40
         });
+
+        if (writePromptToStdin) {
+          proc.write(`${fullPrompt}\x04`);
+        }
       } catch (error) {
         this.emit("status", { agentId: agent.id, status: "error" });
         resolve({ ok: false, error: error instanceof Error ? error.message : String(error) });
@@ -192,6 +259,10 @@ export class AgentRunner extends EventEmitter {
       }
 
       proc.onData((data) => {
+        if (captureStrategy === "stdout") {
+          stdoutBuffer += data;
+        }
+
         this.emit("data", { agentId: agent.id, data });
       });
 
@@ -199,16 +270,22 @@ export class AgentRunner extends EventEmitter {
         const elapsedMs = Date.now() - startedAt;
         let lastMessage = "";
 
-        try {
-          lastMessage = await fs.readFile(tmpFile, "utf8");
-        } catch {
-          lastMessage = "";
+        if (captureStrategy === "file") {
+          try {
+            lastMessage = await fs.readFile(tmpFile, "utf8");
+          } catch {
+            lastMessage = "";
+          }
+        } else {
+          lastMessage = stripAnsi(stdoutBuffer).trim();
         }
 
-        try {
-          await fs.remove(tmpFile);
-        } catch {
-          // Best effort cleanup.
+        if (captureStrategy === "file") {
+          try {
+            await fs.remove(tmpFile);
+          } catch {
+            // Best effort cleanup.
+          }
         }
 
         this.emit("status", { agentId: agent.id, status: exitCode === 0 ? "stopped" : "error" });
