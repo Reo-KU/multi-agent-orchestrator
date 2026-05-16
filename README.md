@@ -45,3 +45,35 @@ Workspace JSON paths are defined in `src/utils/storage.ts` and point to:
 ```text
 ~/.multi-agent-orchestrator/workspaces/default/
 ```
+
+## Troubleshooting
+
+### node-pty: spawn-helper permission error
+
+初回起動時に "spawn-helper: Permission denied" が出る場合は以下を実行:
+
+```sh
+chmod +x node_modules/node-pty/build/Release/spawn-helper
+```
+
+このコマンドは postinstall (electron-builder install-app-deps) で自動的に処理される。
+解消しない場合は `npm rebuild node-pty` を手動実行してください。
+
+### rollup: Cannot find module @rollup/rollup-darwin-arm64
+
+npm の optional-dependencies バグが原因です。以下で解消します:
+
+```sh
+rm -rf node_modules package-lock.json
+npm install
+```
+
+### esbuild: installed for another platform
+
+PM/CI 環境とインストール環境の arch が異なる場合 (Rosetta 2 越しに npm install など) に発生。
+両方のバイナリを optionalDependencies に明示して回避できます。
+
+### Electron 起動時にウィンドウが開かない
+
+- ポート競合の可能性: `lsof -i :5173` で確認
+- dev mode は環境変数 `ELECTRON_RENDERER_URL` を使用

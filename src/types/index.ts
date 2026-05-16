@@ -57,6 +57,7 @@ export type IpcChannels = {
   "mao:pty:spawn": (agentId: string) => Promise<{ ok: true } | { ok: false; error: string }>;
   "mao:pty:write": (agentId: string, data: string) => Promise<void>;
   "mao:pty:kill": (agentId: string) => Promise<void>;
+  "mao:log:append": (agentId: string, data: string) => Promise<void>;
 };
 
 export type PtyDataEvent = { agentId: string; data: string };
