@@ -62,6 +62,8 @@ export default function Inspector(): ReactElement {
   const policy = agent?.permissionPolicy ?? "safe-auto";
   const policyFlags =
     policy === "ask" ? "(フラグ無し)" : policy === "safe-auto" && agent ? safeAutoFlags[agent.type] : agent ? yoloFlags[agent.type] : "(なし)";
+  const isAskExecClaude = policy === "ask" && agentMode === "exec" && agent?.type === "claude";
+  const isAskExecOther = policy === "ask" && agentMode === "exec" && agent?.type !== "claude";
 
   const loadSummary = async (agentId: string): Promise<void> => {
     setSummaryLoading(true);
@@ -156,6 +158,17 @@ export default function Inspector(): ReactElement {
             >
               変更 (Edit)
             </button>
+            {isAskExecClaude ? (
+              <p className="mt-1 text-[11px] text-green-300">
+                ✓ claude の権限要求は MAO の承認ダイアログで都度確認します
+              </p>
+            ) : null}
+            {isAskExecOther && agent ? (
+              <p className="mt-1 text-[11px] text-yellow-400">
+                ⚠️ {agent.type} の ask は exec モードでは承認 UI が無く、CLI 既定で多くが拒否されます。
+                承認 UI が必要なら mode=interactive + 下部 Terminal、または policy=safe-auto / yolo を選択してください。
+              </p>
+            ) : null}
           </div>
           <Info label="Command" value={[agent.command, ...(agent.args ?? [])].join(" ")} />
           <details className="rounded border border-slate-800 bg-slate-900/40 p-2">

@@ -6,6 +6,8 @@ import type {
   AgentSummary,
   GraphEdge,
   GraphNode,
+  PermissionDecision,
+  PermissionRequestEvent,
   PtyDataEvent,
   PtyStatusEvent,
   Task
@@ -39,6 +41,10 @@ type MaoApi = {
   };
   log: {
     append: (agentId: string, data: string) => Promise<void>;
+  };
+  permission: {
+    respond: (requestId: string, decision: PermissionDecision) => Promise<boolean>;
+    onRequest: (callback: (event: PermissionRequestEvent) => void) => () => void;
   };
   onPtyData: (callback: (event: PtyDataEvent) => void) => () => void;
   onPtyStatus: (callback: (event: PtyStatusEvent) => void) => () => void;

@@ -106,6 +106,19 @@ export type AgentRunResult =
   | { ok: true; lastMessage: string; exitCode: number; elapsedMs: number }
   | { ok: false; error: string };
 
+export type PermissionRequestEvent = {
+  requestId: string;
+  agentId: string;
+  agentName: string;
+  toolName: string;
+  input: unknown;
+};
+
+export type PermissionDecision = {
+  allowed: boolean;
+  reason?: string;
+};
+
 // IPC 契約 — Pane2(frontend) と Pane3(backend) はこれをimportして使う
 export type IpcChannels = {
   "mao:agent:list": () => Promise<Agent[]>;
@@ -124,6 +137,7 @@ export type IpcChannels = {
   "mao:pty:write": (agentId: string, data: string) => Promise<void>;
   "mao:pty:kill": (agentId: string) => Promise<void>;
   "mao:log:append": (agentId: string, data: string) => Promise<void>;
+  "mao:permission:respond": (requestId: string, decision: PermissionDecision) => Promise<boolean>;
 };
 
 export type PtyDataEvent = { agentId: string; data: string };

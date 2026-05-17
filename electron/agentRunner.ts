@@ -253,6 +253,11 @@ export declare interface AgentRunner {
 
 export class AgentRunner extends EventEmitter {
   private readonly activePtys = new Map<string, pty.IPty>();
+  private mcpPermissionPort = 0;
+
+  setMcpPort(port: number): void {
+    this.mcpPermissionPort = port;
+  }
 
   async run(req: AgentRunRequest, agent: Agent): Promise<AgentRunResult> {
     const commandName = getCommandName(agent.command ?? "");
@@ -270,8 +275,44 @@ export class AgentRunner extends EventEmitter {
     const mode = detectCliMode(commandName);
     const policy = agent.permissionPolicy ?? "safe-auto";
     const policyArgs = buildPolicyArgs(mode, policy);
+    const cleanupFiles: string[] = [];
+    let extraEnv: Record<string, string> = {};
+    let extraInjectedArgs: string[] = [];
+
+    if (mode === "claude" && (agent.mode ?? "exec") === "exec" && policy === "ask") {
+      const mcpConfigPath = join(tmpdir(), `mao_mcp_${agent.id}_${randomBytes(6).toString("hex")}.json`);
+      const bridgePath = path.resolve(__dirname, "../../electron/mcpPermissionBridge.mjs");
+
+      await fs.writeJson(
+        mcpConfigPath,
+        {
+          mcpServers: {
+            maoperm: {
+              type: "stdio",
+              command: "node",
+              args: [bridgePath]
+            }
+          }
+        },
+        { spaces: 2 }
+      );
+      cleanupFiles.push(mcpConfigPath);
+
+      extraInjectedArgs = [
+        "--mcp-config",
+        mcpConfigPath,
+        "--permission-prompt-tool",
+        "mcp__maoperm__approve_request"
+      ];
+      extraEnv = {
+        MAO_PERM_PORT: String(this.mcpPermissionPort),
+        MAO_AGENT_ID: agent.id,
+        MAO_AGENT_NAME: agent.name
+      };
+    }
+
     const flatExtraArgs = flattenExtraArgs(agent.args);
-    const combinedExtraArgs = [...policyArgs, ...flatExtraArgs];
+    const combinedExtraArgs = [...policyArgs, ...extraInjectedArgs, ...flatExtraArgs];
     const { args, captureStrategy, writePromptToStdin } = buildRunArgs(
       mode,
       workingDirectory,
@@ -291,7 +332,7 @@ export class AgentRunner extends EventEmitter {
       try {
         proc = pty.spawn(agent.command, args, {
           cwd: workingDirectory,
-          env: process.env as Record<string, string>,
+          env: { ...(process.env as Record<string, string>), ...extraEnv },
           cols: 140,
           rows: 40
         });
@@ -332,6 +373,14 @@ export class AgentRunner extends EventEmitter {
         if (captureStrategy === "file") {
           try {
             await fs.remove(tmpFile);
+          } catch {
+            // Best effort cleanup.
+          }
+        }
+
+        for (const filePath of cleanupFiles) {
+          try {
+            await fs.remove(filePath);
           } catch {
             // Best effort cleanup.
           }

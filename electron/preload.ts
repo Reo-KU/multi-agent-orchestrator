@@ -7,6 +7,8 @@ import type {
   AgentSummary,
   GraphEdge,
   GraphNode,
+  PermissionDecision,
+  PermissionRequestEvent,
   PtyDataEvent,
   PtyStatusEvent,
   Task
@@ -44,6 +46,18 @@ contextBridge.exposeInMainWorld("mao", {
   },
   log: {
     append: (agentId: string, data: string): Promise<void> => ipcRenderer.invoke("mao:log:append", agentId, data)
+  },
+  permission: {
+    respond: (requestId: string, decision: PermissionDecision): Promise<boolean> =>
+      ipcRenderer.invoke("mao:permission:respond", requestId, decision),
+    onRequest: (callback: (event: PermissionRequestEvent) => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, payload: PermissionRequestEvent): void => {
+        callback(payload);
+      };
+
+      ipcRenderer.on("mao:permission:request", listener);
+      return () => ipcRenderer.off("mao:permission:request", listener);
+    }
   },
   onPtyData: (callback: (event: PtyDataEvent) => void): (() => void) => {
     const listener = (_event: Electron.IpcRendererEvent, payload: PtyDataEvent): void => {

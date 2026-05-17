@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactElement, type MouseEvent } from "react";
 import AgentList from "./components/AgentList";
 import Inspector from "./components/Inspector";
 import MindMapCanvas from "./components/MindMapCanvas";
+import PermissionDialog from "./components/PermissionDialog";
 import ProjectSummaryModal from "./components/ProjectSummaryModal";
 import TaskInput from "./components/TaskInput";
 import TerminalPanel from "./components/TerminalPanel";
@@ -112,6 +113,7 @@ export default function App(): ReactElement {
       {projectModalOpen ? (
         <ProjectSummaryModal onClose={() => setProjectModalOpen(false)} />
       ) : null}
+      <PermissionDialog />
     </main>
   );
 }

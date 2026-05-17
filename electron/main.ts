@@ -11,6 +11,7 @@ import type {
   GraphEdge,
   GraphNode,
   IpcChannels,
+  PermissionDecision,
   Task
 } from "../src/types";
 import {
@@ -23,6 +24,7 @@ import {
 } from "../src/utils/storage";
 import { maskSecrets } from "../src/utils/maskSecrets";
 import { AgentRunner } from "./agentRunner";
+import { MCPPermissionServer } from "./mcpPermissionServer";
 import { createShellTestAgent, PtyManager } from "./ptyManager";
 
 const agentSchema = z.object({
@@ -75,6 +77,7 @@ const tasksSchema = z.array(taskSchema);
 
 const ptyManager = new PtyManager();
 const agentRunner = new AgentRunner();
+const mcpPermissionServer = new MCPPermissionServer();
 let didRunSmokeTest = false;
 const writeLocks = new Map<string, Promise<void>>();
 
@@ -342,6 +345,17 @@ const registerIpcHandlers = (): void => {
       await fs.appendFile(join(logDir, `${agentId}.log`), data);
     }
   );
+
+  ipcMain.handle(
+    "mao:permission:respond" satisfies keyof IpcChannels,
+    async (
+      _event,
+      requestId: string,
+      decision: PermissionDecision
+    ): ReturnType<IpcChannels["mao:permission:respond"]> => {
+      return mcpPermissionServer.respond(requestId, decision);
+    }
+  );
 };
 
 const registerPtyBroadcasts = (): void => {
@@ -374,6 +388,12 @@ const registerPtyBroadcasts = (): void => {
   agentRunner.on("status", ({ agentId, status }) => {
     for (const browserWindow of BrowserWindow.getAllWindows()) {
       browserWindow.webContents.send("mao:pty:status", { agentId, status });
+    }
+  });
+
+  mcpPermissionServer.on("request", (payload) => {
+    for (const browserWindow of BrowserWindow.getAllWindows()) {
+      browserWindow.webContents.send("mao:permission:request", payload);
     }
   });
 };
@@ -409,6 +429,9 @@ const createWindow = (): void => {
 };
 
 app.whenReady().then(async () => {
+  const mcpPort = await mcpPermissionServer.start();
+  agentRunner.setMcpPort(mcpPort);
+  console.log("[MAO] MCP permission server listening on port", mcpPort);
   await initializeStorage();
   registerIpcHandlers();
   registerPtyBroadcasts();
@@ -430,4 +453,5 @@ app.on("window-all-closed", () => {
 app.on("will-quit", () => {
   ptyManager.killAll();
   agentRunner.killAll();
+  void mcpPermissionServer.stop();
 });
