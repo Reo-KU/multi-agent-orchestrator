@@ -19,6 +19,7 @@ import {
   AGENTS_JSON_PATH,
   GRAPH_JSON_PATH,
   PROJECT_SUMMARY_PATH,
+  TASK_SIGNALS_PATH,
   TASKS_JSON_PATH,
   WORKSPACE_ROOT
 } from "../src/utils/storage";
@@ -77,6 +78,7 @@ const tasksSchema = z.array(taskSchema);
 
 const ptyManager = new PtyManager();
 const agentRunner = new AgentRunner();
+agentRunner.setPtyManager(ptyManager);
 const mcpPermissionServer = new MCPPermissionServer();
 let didRunSmokeTest = false;
 const writeLocks = new Map<string, Promise<void>>();
@@ -131,6 +133,10 @@ const initializeStorage = async (): Promise<void> => {
   await ensureJsonFile(GRAPH_JSON_PATH, { nodes: [], edges: [] });
   await ensureJsonFile(TASKS_JSON_PATH, []);
   await ensureJsonFile(AGENT_HISTORY_PATH, {});
+
+  if (!(await fs.pathExists(TASK_SIGNALS_PATH))) {
+    await fs.writeFile(TASK_SIGNALS_PATH, "", "utf8");
+  }
 
   if (!(await fs.pathExists(PROJECT_SUMMARY_PATH))) {
     await fs.writeFile(
@@ -199,11 +205,16 @@ const registerIpcHandlers = (): void => {
         return { ok: false, error: `Agent not found: ${request.agentId}` } satisfies AgentRunResult;
       }
 
-      if ((agent.mode ?? "exec") !== "exec") {
-        return { ok: false, error: `Agent mode is not 'exec': ${agent.mode}` } satisfies AgentRunResult;
+      const mode = agent.mode ?? "exec";
+      if (mode === "exec") {
+        return agentRunner.run(request, agent);
       }
 
-      return agentRunner.run(request, agent);
+      if (mode === "interactive") {
+        return agentRunner.runInteractive(request, agent);
+      }
+
+      return { ok: false, error: `Unknown mode: ${mode}` } satisfies AgentRunResult;
     }
   );
 

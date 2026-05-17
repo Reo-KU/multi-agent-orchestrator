@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { tmpdir } from "node:os";
 import path, { join } from "node:path";
@@ -15,7 +15,9 @@ import type {
   PtyDataEvent,
   PtyStatusEvent
 } from "../src/types";
+import { TASK_SIGNALS_PATH } from "../src/utils/storage";
 import { stripAnsi } from "../src/utils/stripAnsi";
+import type { PtyManager } from "./ptyManager";
 
 type AgentRunnerEvents = {
   data: [PtyDataEvent];
@@ -267,10 +269,29 @@ export declare interface AgentRunner {
 
 export class AgentRunner extends EventEmitter {
   private readonly activePtys = new Map<string, pty.IPty>();
+  private readonly interactiveBuffers = new Map<string, string>();
+  private ptyManager: PtyManager | null = null;
+  private isPtyManagerSubscribed = false;
   private mcpPermissionPort = 0;
 
   setMcpPort(port: number): void {
     this.mcpPermissionPort = port;
+  }
+
+  setPtyManager(ptyManager: PtyManager): void {
+    this.ptyManager = ptyManager;
+
+    if (this.isPtyManagerSubscribed) {
+      return;
+    }
+
+    this.isPtyManagerSubscribed = true;
+    ptyManager.on("data", ({ agentId, data }) => {
+      const current = this.interactiveBuffers.get(agentId);
+      if (current !== undefined) {
+        this.interactiveBuffers.set(agentId, current + data);
+      }
+    });
   }
 
   async run(req: AgentRunRequest, agent: Agent): Promise<AgentRunResult> {
@@ -404,6 +425,96 @@ export class AgentRunner extends EventEmitter {
         resolve({ ok: true, lastMessage, exitCode, elapsedMs });
       });
     });
+  }
+
+  async runInteractive(req: AgentRunRequest, agent: Agent): Promise<AgentRunResult> {
+    if (!this.ptyManager) {
+      return { ok: false, error: "PtyManager not configured for AgentRunner" };
+    }
+
+    const commandName = getCommandName(agent.command ?? "");
+    if (!ALLOWED_COMMANDS.has(commandName)) {
+      return { ok: false, error: `Command not in allowlist: ${commandName}` };
+    }
+
+    const workingDirectory = path.resolve(agent.workingDirectory);
+    if (!(await fs.pathExists(workingDirectory))) {
+      return { ok: false, error: `workingDirectory does not exist: ${workingDirectory}` };
+    }
+
+    if (!this.ptyManager.has(agent.id)) {
+      const spawnResult = this.ptyManager.spawn(agent);
+      if (!spawnResult.ok) {
+        return { ok: false, error: spawnResult.error };
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+    }
+
+    const taskCallId = randomUUID();
+    const signalLine = `MAO_TASK_DONE\t${taskCallId}`;
+    const basePrompt = composePrompt(agent, req.body, req.context);
+    const signalInstruction = [
+      "",
+      "## MAO 完了通知 (必須・厳守)",
+      "上記タスクの応答が完了したら、必ず最後に以下を shell で実行してください:",
+      "",
+      `  echo -e "${signalLine}\\t$(date -u +%FT%TZ)" >> ${TASK_SIGNALS_PATH}`,
+      "",
+      "これを実行しないと MAO はタスク完了を検知できず、後続の処理が始まりません。",
+      "[TO: ...] ブロックがある場合は応答中に出力し、その後に上の signal を出してください。"
+    ].join("\n");
+    const fullPrompt = `${basePrompt}\n\n${signalInstruction}`;
+
+    this.interactiveBuffers.set(agent.id, "");
+    this.emit("status", { agentId: agent.id, status: "running" });
+
+    this.ptyManager.write(agent.id, fullPrompt);
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    this.ptyManager.write(agent.id, "\r");
+
+    const startedAt = Date.now();
+    const timeoutMs = 5 * 60 * 1000;
+    let signaledAt: number | null = null;
+
+    while (Date.now() - startedAt < timeoutMs) {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+
+      try {
+        const content = await fs.readFile(TASK_SIGNALS_PATH, "utf8");
+        if (content.includes(`MAO_TASK_DONE\t${taskCallId}`)) {
+          signaledAt = Date.now();
+          break;
+        }
+      } catch {
+        // Keep polling until timeout.
+      }
+    }
+
+    const elapsedMs = Date.now() - startedAt;
+    const buffer = this.interactiveBuffers.get(agent.id) ?? "";
+    this.interactiveBuffers.delete(agent.id);
+    this.emit("status", { agentId: agent.id, status: "running" });
+
+    if (!signaledAt) {
+      return {
+        ok: false,
+        error: `Timeout waiting for MAO_TASK_DONE signal after ${Math.round(
+          elapsedMs / 1000
+        )}s. Buffer length: ${buffer.length}`
+      };
+    }
+
+    const cleanBuffer = stripAnsi(buffer);
+    const signalIndex = cleanBuffer.lastIndexOf("MAO_TASK_DONE");
+    const lastMessage = (signalIndex > 0 ? cleanBuffer.slice(0, signalIndex) : cleanBuffer).trim();
+
+    return {
+      ok: true,
+      lastMessage,
+      exitCode: 0,
+      elapsedMs
+    };
   }
 
   write(agentId: string, data: string): boolean {

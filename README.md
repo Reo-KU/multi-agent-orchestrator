@@ -96,6 +96,9 @@ In short:
 - "I want full automation with sandboxing" → leave `safe-auto` on, escalate
   individual agents to `yolo` only when needed.
 
+Interactive mode uses a completion-signal flow through `agent.run`; it is useful
+for long-running tasks or permission-heavy work, with a five-minute timeout.
+
 ## Troubleshooting
 
 ### node-pty: spawn-helper permission error

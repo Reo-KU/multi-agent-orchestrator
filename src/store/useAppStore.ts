@@ -723,13 +723,6 @@ async function executeForAgent(
     return;
   }
 
-  const effectiveMode: AgentMode = agent.mode ?? "exec";
-  if (effectiveMode === "interactive") {
-    await state.ensureAgentReady(agentId);
-    await submitToAgent(agentId, body);
-    return;
-  }
-
   const context = await buildContextSnapshot(agentId, taskState);
   const result = await mao().agent.run({
     agentId,
