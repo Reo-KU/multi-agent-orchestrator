@@ -312,14 +312,24 @@ const registerIpcHandlers = (): void => {
   ipcMain.handle(
     "mao:pty:write" satisfies keyof IpcChannels,
     async (_event, agentId: string, data: string): ReturnType<IpcChannels["mao:pty:write"]> => {
-      ptyManager.write(agentId, data);
+      if (ptyManager.has(agentId)) {
+        ptyManager.write(agentId, data);
+        return;
+      }
+
+      agentRunner.write(agentId, data);
     }
   );
 
   ipcMain.handle(
     "mao:pty:kill" satisfies keyof IpcChannels,
     async (_event, agentId: string): ReturnType<IpcChannels["mao:pty:kill"]> => {
-      ptyManager.kill(agentId);
+      if (ptyManager.has(agentId)) {
+        ptyManager.kill(agentId);
+        return;
+      }
+
+      agentRunner.kill(agentId);
     }
   );
 
@@ -418,4 +428,5 @@ app.on("window-all-closed", () => {
 
 app.on("will-quit", () => {
   ptyManager.killAll();
+  agentRunner.killAll();
 });

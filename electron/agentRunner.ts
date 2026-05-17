@@ -215,6 +215,8 @@ export declare interface AgentRunner {
 }
 
 export class AgentRunner extends EventEmitter {
+  private readonly activePtys = new Map<string, pty.IPty>();
+
   async run(req: AgentRunRequest, agent: Agent): Promise<AgentRunResult> {
     const commandName = getCommandName(agent.command ?? "");
     if (!ALLOWED_COMMANDS.has(commandName)) {
@@ -252,6 +254,7 @@ export class AgentRunner extends EventEmitter {
           cols: 140,
           rows: 40
         });
+        this.activePtys.set(agent.id, proc);
 
         if (writePromptToStdin) {
           proc.write(`${fullPrompt}\x04`);
@@ -271,6 +274,7 @@ export class AgentRunner extends EventEmitter {
       });
 
       proc.onExit(async ({ exitCode }) => {
+        this.activePtys.delete(agent.id);
         const elapsedMs = Date.now() - startedAt;
         let lastMessage = "";
 
@@ -296,5 +300,38 @@ export class AgentRunner extends EventEmitter {
         resolve({ ok: true, lastMessage, exitCode, elapsedMs });
       });
     });
+  }
+
+  write(agentId: string, data: string): boolean {
+    const proc = this.activePtys.get(agentId);
+    if (!proc) {
+      return false;
+    }
+
+    proc.write(data);
+    return true;
+  }
+
+  kill(agentId: string): boolean {
+    const proc = this.activePtys.get(agentId);
+    if (!proc) {
+      return false;
+    }
+
+    proc.kill();
+    this.activePtys.delete(agentId);
+    return true;
+  }
+
+  killAll(): void {
+    for (const proc of this.activePtys.values()) {
+      try {
+        proc.kill();
+      } catch {
+        // Best effort shutdown.
+      }
+    }
+
+    this.activePtys.clear();
   }
 }

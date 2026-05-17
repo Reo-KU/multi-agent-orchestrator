@@ -1,7 +1,24 @@
 import { useEffect, useState, type ReactElement } from "react";
 import { useAppStore } from "../store/useAppStore";
-import type { AgentSummary } from "../types";
+import type { Agent, AgentSummary } from "../types";
 import AgentForm from "./AgentForm";
+
+const permissionHints: Record<Agent["type"], string[]> = {
+  codex: [
+    "--sandbox workspace-write  (cwd 内書き込み許可)",
+    "--dangerously-bypass-approvals-and-sandbox  (全承認スキップ・危険)"
+  ],
+  claude: [
+    "--permission-mode acceptEdits  (編集を自動承認)",
+    "--dangerously-skip-permissions  (全承認スキップ・危険)"
+  ],
+  gemini: [
+    "--approval-mode auto_edit  (編集を自動承認)",
+    "--yolo  (全承認スキップ・危険)"
+  ],
+  grok: ["(grok の権限フラグは CLI のドキュメントを参照)"],
+  custom: ["(該当 CLI のドキュメントを参照)"]
+};
 
 export default function Inspector(): ReactElement {
   const agents = useAppStore((state) => state.agents);
@@ -100,6 +117,19 @@ export default function Inspector(): ReactElement {
             </select>
           </label>
           <Info label="Command" value={[agent.command, ...(agent.args ?? [])].join(" ")} />
+          <details className="rounded border border-slate-800 bg-slate-900/40 p-2">
+            <summary className="cursor-pointer text-xs text-slate-400">
+              権限ヒント (type={agent.type})
+            </summary>
+            <ul className="mt-2 space-y-1 text-xs text-slate-300">
+              {permissionHints[agent.type].map((line) => (
+                <li key={line}>- {line}</li>
+              ))}
+            </ul>
+            <p className="mt-2 text-[11px] text-slate-500">
+              Args 欄に貼り付けて使用してください。承認 UI が必要なら最下部 Terminal を直接操作することも可能です。
+            </p>
+          </details>
           <Info label="Working Directory" value={agent.workingDirectory || "-"} />
           <Info label="Role" value={agent.role || "-"} />
           <Info label="System Prompt" value={agent.systemPrompt || "-"} multiline />
@@ -119,8 +149,12 @@ export default function Inspector(): ReactElement {
             <button
               type="button"
               onClick={() => void stop()}
-              disabled={agentMode === "exec"}
-              title={agentMode === "exec" ? "exec mode は task 実行時に自動 spawn します" : undefined}
+              disabled={agentMode === "exec" && agent.status !== "running" && agent.status !== "starting"}
+              title={
+                agentMode === "exec" && agent.status !== "running" && agent.status !== "starting"
+                  ? "exec mode の Stop は実行中のみ有効"
+                  : "実行中のプロセスを終了 (SIGHUP)"
+              }
               className="rounded bg-red-500 px-3 py-2 text-sm font-medium text-red-950 hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Stop

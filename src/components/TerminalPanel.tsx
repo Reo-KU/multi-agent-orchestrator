@@ -52,10 +52,15 @@ export default function TerminalPanel(): ReactElement {
     entries.forEach((entry) => terminal.write(maskSecrets(entry)));
     writtenCountsRef.current[activeAgent.id] = entries.length;
 
+    const inputDisposable = terminal.onData((data) => {
+      void window.mao.pty.write(activeAgent.id, data);
+    });
+
     const onResize = (): void => fitAddon.fit();
     window.addEventListener("resize", onResize);
 
     return () => {
+      inputDisposable.dispose();
       window.removeEventListener("resize", onResize);
       terminal.dispose();
       terminalRef.current = null;
@@ -95,8 +100,32 @@ export default function TerminalPanel(): ReactElement {
               }`}
             >
               {agent.name}
+              {agent.status === "running" ? (
+                <span className="ml-1.5 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-green-400 align-middle" />
+              ) : null}
             </button>
           ))}
+          {activeAgent ? (
+            <div className="ml-auto flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => void window.mao.pty.write(activeAgent.id, "\x03")}
+                title="Send Ctrl+C (SIGINT) to this agent"
+                className="rounded border border-slate-800 px-2 py-1 text-[11px] text-slate-300 hover:bg-slate-900"
+              >
+                ^C
+              </button>
+              <button
+                type="button"
+                onClick={() => void window.mao.pty.kill(activeAgent.id)}
+                disabled={activeAgent.status !== "running" && activeAgent.status !== "starting"}
+                title="Kill this agent's running process (SIGHUP)"
+                className="rounded bg-red-500 px-2.5 py-1 text-[11px] font-medium text-red-950 hover:bg-red-400 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:text-slate-500"
+              >
+                ■ Stop
+              </button>
+            </div>
+          ) : null}
         </div>
         <div className="min-h-0 flex-1 overflow-hidden p-2">
           {activeAgent ? (
