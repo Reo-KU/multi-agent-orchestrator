@@ -64,6 +64,7 @@ export default function Inspector(): ReactElement {
     policy === "ask" ? "(フラグ無し)" : policy === "safe-auto" && agent ? safeAutoFlags[agent.type] : agent ? yoloFlags[agent.type] : "(なし)";
   const isAskExecClaude = policy === "ask" && agentMode === "exec" && agent?.type === "claude";
   const isAskExecOther = policy === "ask" && agentMode === "exec" && agent?.type !== "claude";
+  const isAskInteractive = policy === "ask" && agentMode === "interactive";
 
   const loadSummary = async (agentId: string): Promise<void> => {
     setSummaryLoading(true);
@@ -167,6 +168,11 @@ export default function Inspector(): ReactElement {
               <p className="mt-1 text-[11px] text-yellow-400">
                 ⚠️ {agent.type} の ask は exec モードでは承認 UI が無く、CLI 既定で多くが拒否されます。
                 承認 UI が必要なら mode=interactive + 下部 Terminal、または policy=safe-auto / yolo を選択してください。
+              </p>
+            ) : null}
+            {isAskInteractive ? (
+              <p className="mt-1 text-[11px] text-cyan-300">
+                ℹ️ interactive モード: 承認プロンプトは下部 Terminal に表示されます。タブをクリックして直接 y/n を入力してください。
               </p>
             ) : null}
           </div>

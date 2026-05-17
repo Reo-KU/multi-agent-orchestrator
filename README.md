@@ -61,13 +61,40 @@ Workspace JSON paths are defined in `src/utils/storage.ts` and point to:
 
 ## Permission Policy
 
-Agents can use a `permissionPolicy` to let MAO choose common approval flags.
-`safe-auto` is the default and allows normal edit workflows such as cwd writes.
-`ask` adds no approval flags and leaves prompts to the CLI or interactive terminal.
-`yolo` maps to each CLI's full bypass flag, such as Codex
-`--dangerously-bypass-approvals-and-sandbox`, Claude
-`--dangerously-skip-permissions`, or Gemini `--yolo`.
-Use `yolo` only when you understand the security risk.
+Each agent has a `permissionPolicy` which MAO translates to the appropriate
+CLI-specific flags at spawn time:
+
+| Policy | codex | claude | gemini |
+|---|---|---|---|
+| `safe-auto` (default) | `--sandbox workspace-write` | `--permission-mode acceptEdits` | `--approval-mode auto_edit` |
+| `yolo` | `--dangerously-bypass-approvals-and-sandbox` | `--dangerously-skip-permissions` | `--yolo` |
+| `ask` | (no flags) | (no flags) | (no flags) |
+
+`safe-auto` is the right default for most workflows: agents can edit files
+inside the cwd but can't escape it or run network/shell side-effects without
+prompting. `yolo` skips every prompt; only use it when you trust the task and
+are prepared to clean up afterwards.
+
+### `ask` (per-call approval) and how it differs by CLI
+
+`ask` is the only policy where MAO can interpose itself between the model and
+each dangerous tool call. The plumbing depends on what the CLI exposes:
+
+| CLI | `ask` + `exec` | `ask` + `interactive` |
+|---|---|---|
+| **claude** | ✅ MAO modal. Each tool call (Write, Bash, etc.) pops a "⚠️ Permission Request" dialog with the tool name and input. Approve / Deny is forwarded to claude via its `--permission-prompt-tool` MCP hook. | ✅ Same modal; or the CLI's own TUI prompt in the bottom terminal if `--permission-prompt-tool` is not loaded. |
+| **codex** | ⚠️ No per-call approval — codex `exec` is hard-wired to `approval: never`, and codex has no equivalent of claude's `--permission-prompt-tool`. The CLI silently denies anything that needs approval. Inspector shows a yellow warning for this combination. | ✅ codex's native TUI prompt appears in the bottom terminal. Click the active tab, type `y`/`n`/`1`/`2` to answer. |
+| **gemini** | ⚠️ Same situation as codex — no programmatic hook. Inspector warns. | ✅ Gemini's TUI prompt appears in the bottom terminal; respond there. |
+| **grok / custom** | ⚠️ CLI-specific. | ✅ If the CLI prints a prompt to its TUI, answer it from the bottom terminal. |
+
+In short:
+
+- "I want every privileged operation to pop a dialog" → use **claude** with
+  `mode=exec` and `permissionPolicy=ask`. This is the cleanest experience.
+- "I'm using codex or gemini and need approvals" → switch the agent to
+  `mode=interactive`, then approve in the bottom terminal panel directly.
+- "I want full automation with sandboxing" → leave `safe-auto` on, escalate
+  individual agents to `yolo` only when needed.
 
 ## Troubleshooting
 
