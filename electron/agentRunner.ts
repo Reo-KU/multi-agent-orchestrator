@@ -10,6 +10,7 @@ import type {
   AgentRunResult,
   ContextSnapshot,
   GraphSnapshotForContext,
+  PermissionPolicy,
   PtyDataEvent,
   PtyStatusEvent
 } from "../src/types";
@@ -56,6 +57,42 @@ const detectCliMode = (commandName: string): CliMode => {
 
 const flattenExtraArgs = (args: string[] | undefined): string[] =>
   (args ?? []).flatMap((arg) => arg.split(/\s+/)).filter((arg) => arg.length > 0);
+
+const buildPolicyArgs = (mode: CliMode, policy: PermissionPolicy): string[] => {
+  if (policy === "safe-auto") {
+    if (mode === "codex") {
+      return ["--sandbox", "workspace-write"];
+    }
+
+    if (mode === "claude") {
+      return ["--permission-mode", "acceptEdits"];
+    }
+
+    if (mode === "gemini") {
+      return ["--approval-mode", "auto_edit"];
+    }
+
+    return [];
+  }
+
+  if (policy === "yolo") {
+    if (mode === "codex") {
+      return ["--dangerously-bypass-approvals-and-sandbox"];
+    }
+
+    if (mode === "claude") {
+      return ["--dangerously-skip-permissions"];
+    }
+
+    if (mode === "gemini") {
+      return ["--yolo"];
+    }
+
+    return [];
+  }
+
+  return [];
+};
 
 const buildRunArgs = (
   mode: CliMode,
@@ -231,14 +268,18 @@ export class AgentRunner extends EventEmitter {
     const tmpFile = join(tmpdir(), `mao_agent_${agent.id}_${randomBytes(6).toString("hex")}.txt`);
     const fullPrompt = composePrompt(agent, req.body, req.context);
     const mode = detectCliMode(commandName);
+    const policy = agent.permissionPolicy ?? "safe-auto";
+    const policyArgs = buildPolicyArgs(mode, policy);
     const flatExtraArgs = flattenExtraArgs(agent.args);
+    const combinedExtraArgs = [...policyArgs, ...flatExtraArgs];
     const { args, captureStrategy, writePromptToStdin } = buildRunArgs(
       mode,
       workingDirectory,
       tmpFile,
       fullPrompt,
-      flatExtraArgs
+      combinedExtraArgs
     );
+    console.log(`[AgentRunner] ${agent.name} (mode=${mode}, policy=${policy}) args:`, args);
 
     this.emit("status", { agentId: agent.id, status: "running" });
 

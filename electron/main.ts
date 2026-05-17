@@ -30,6 +30,7 @@ const agentSchema = z.object({
   name: z.string(),
   type: z.enum(["claude", "codex", "grok", "gemini", "custom"]),
   mode: z.enum(["exec", "interactive"]).optional().default("exec"),
+  permissionPolicy: z.enum(["ask", "safe-auto", "yolo"]).optional().default("safe-auto"),
   command: z.string(),
   args: z.array(z.string()).optional(),
   workingDirectory: z.string(),

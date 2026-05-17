@@ -15,6 +15,7 @@ const emptyAgent = (): Agent => ({
   name: "",
   type: "custom",
   mode: "exec",
+  permissionPolicy: "safe-auto",
   command: "",
   args: [],
   workingDirectory: "",
@@ -49,6 +50,7 @@ export default function AgentForm({ agent, onClose }: AgentFormProps): ReactElem
       ...draft,
       name: draft.name.trim(),
       mode: draft.mode ?? "exec",
+      permissionPolicy: draft.permissionPolicy ?? "safe-auto",
       command: draft.command.trim(),
       args: argsText
         .split(/\n|,/)
@@ -127,6 +129,24 @@ export default function AgentForm({ agent, onClose }: AgentFormProps): ReactElem
               <option value="exec">exec</option>
               <option value="interactive">interactive</option>
             </select>
+          </label>
+
+          <label className="grid gap-1 text-sm">
+            <span className="text-slate-300">Permission Policy</span>
+            <select
+              value={draft.permissionPolicy ?? "safe-auto"}
+              onChange={(event) =>
+                update("permissionPolicy", event.target.value as Agent["permissionPolicy"])
+              }
+              className="rounded border border-slate-700 bg-slate-950 px-3 py-2 outline-none focus:border-cyan-500"
+            >
+              <option value="ask">ask (フラグ無し・TUI 任せ)</option>
+              <option value="safe-auto">safe-auto (cwd 内書込み許可・推奨)</option>
+              <option value="yolo">yolo (全承認スキップ・危険)</option>
+            </select>
+            <span className="text-[11px] text-slate-500">
+              safe-auto は cwd 内書き込みのみ自動承認。yolo は何でも実行可能なので注意。
+            </span>
           </label>
 
           <div className="grid grid-cols-2 gap-4">

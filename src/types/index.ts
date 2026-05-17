@@ -1,10 +1,12 @@
 export type AgentMode = "exec" | "interactive";
+export type PermissionPolicy = "ask" | "safe-auto" | "yolo";
 
 export type Agent = {
   id: string;
   name: string;
   type: "claude" | "codex" | "grok" | "gemini" | "custom";
   mode?: AgentMode;
+  permissionPolicy?: PermissionPolicy;
   command: string;
   args?: string[];
   workingDirectory: string;

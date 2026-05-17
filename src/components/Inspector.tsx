@@ -20,6 +20,28 @@ const permissionHints: Record<Agent["type"], string[]> = {
   custom: ["(該当 CLI のドキュメントを参照)"]
 };
 
+const policyBadgeClasses: Record<NonNullable<Agent["permissionPolicy"]>, string> = {
+  ask: "border-yellow-700 bg-yellow-950/40 text-yellow-200",
+  "safe-auto": "border-green-700 bg-green-950/40 text-green-200",
+  yolo: "border-red-700 bg-red-950/40 text-red-200"
+};
+
+const safeAutoFlags: Record<Agent["type"], string> = {
+  codex: "--sandbox workspace-write",
+  claude: "--permission-mode acceptEdits",
+  gemini: "--approval-mode auto_edit",
+  grok: "(なし)",
+  custom: "(なし)"
+};
+
+const yoloFlags: Record<Agent["type"], string> = {
+  codex: "--dangerously-bypass-approvals-and-sandbox",
+  claude: "--dangerously-skip-permissions",
+  gemini: "--yolo",
+  grok: "(なし)",
+  custom: "(なし)"
+};
+
 export default function Inspector(): ReactElement {
   const agents = useAppStore((state) => state.agents);
   const nodes = useAppStore((state) => state.nodes);
@@ -37,6 +59,9 @@ export default function Inspector(): ReactElement {
   const selectedNode = nodes.find((node) => node.id === selectedNodeId);
   const agent = agents.find((item) => item.id === selectedNode?.agentId);
   const agentMode = agent?.mode ?? "exec";
+  const policy = agent?.permissionPolicy ?? "safe-auto";
+  const policyFlags =
+    policy === "ask" ? "(フラグ無し)" : policy === "safe-auto" && agent ? safeAutoFlags[agent.type] : agent ? yoloFlags[agent.type] : "(なし)";
 
   const loadSummary = async (agentId: string): Promise<void> => {
     setSummaryLoading(true);
@@ -116,6 +141,22 @@ export default function Inspector(): ReactElement {
               <option value="interactive">Interactive (legacy)</option>
             </select>
           </label>
+          <div>
+            <div className="text-xs uppercase tracking-wide text-slate-500">Permission Policy</div>
+            <div className="mt-1 flex items-center gap-2">
+              <span className={`rounded border px-2 py-0.5 text-[11px] font-medium ${policyBadgeClasses[policy]}`}>
+                {policy}
+              </span>
+              <span className="text-xs text-slate-400">{policyFlags}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className="mt-1 text-[11px] text-cyan-400 hover:underline"
+            >
+              変更 (Edit)
+            </button>
+          </div>
           <Info label="Command" value={[agent.command, ...(agent.args ?? [])].join(" ")} />
           <details className="rounded border border-slate-800 bg-slate-900/40 p-2">
             <summary className="cursor-pointer text-xs text-slate-400">

@@ -59,6 +59,16 @@ Workspace JSON paths are defined in `src/utils/storage.ts` and point to:
 - Claude: `--permission-mode acceptEdits`, `--dangerously-skip-permissions`
 - Grok/custom: 利用中 CLI のドキュメントに従って Args に追加してください。
 
+## Permission Policy
+
+Agents can use a `permissionPolicy` to let MAO choose common approval flags.
+`safe-auto` is the default and allows normal edit workflows such as cwd writes.
+`ask` adds no approval flags and leaves prompts to the CLI or interactive terminal.
+`yolo` maps to each CLI's full bypass flag, such as Codex
+`--dangerously-bypass-approvals-and-sandbox`, Claude
+`--dangerously-skip-permissions`, or Gemini `--yolo`.
+Use `yolo` only when you understand the security risk.
+
 ## Troubleshooting
 
 ### node-pty: spawn-helper permission error
