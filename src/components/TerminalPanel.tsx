@@ -13,11 +13,13 @@ export default function TerminalPanel(): ReactElement {
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const writtenCountsRef = useRef<Record<string, number>>({});
+  const [ttydUrl, setTtydUrl] = useState<string | null>(null);
 
   const activeAgent = useMemo(
     () => agents.find((agent) => agent.id === activeAgentId) ?? agents[0],
     [activeAgentId, agents]
   );
+  const activeIsInteractive = (activeAgent?.mode ?? "exec") === "interactive";
 
   useEffect(() => {
     if (!activeAgentId && agents[0]) {
@@ -26,7 +28,25 @@ export default function TerminalPanel(): ReactElement {
   }, [activeAgentId, agents]);
 
   useEffect(() => {
-    if (!containerRef.current || !activeAgent) {
+    if (!activeIsInteractive) {
+      setTtydUrl(null);
+      return;
+    }
+
+    let active = true;
+    void window.mao.tty.getUrl().then((url) => {
+      if (active) {
+        setTtydUrl(url);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [activeIsInteractive, activeAgent?.id]);
+
+  useEffect(() => {
+    if (!containerRef.current || !activeAgent || activeIsInteractive) {
       return;
     }
 
@@ -66,10 +86,10 @@ export default function TerminalPanel(): ReactElement {
       terminalRef.current = null;
       fitAddonRef.current = null;
     };
-  }, [activeAgent?.id]);
+  }, [activeAgent?.id, activeIsInteractive]);
 
   useEffect(() => {
-    if (!activeAgent || !terminalRef.current) {
+    if (!activeAgent || !terminalRef.current || activeIsInteractive) {
       return;
     }
 
@@ -79,7 +99,15 @@ export default function TerminalPanel(): ReactElement {
     nextEntries.forEach((entry) => terminalRef.current?.write(maskSecrets(entry)));
     writtenCountsRef.current[activeAgent.id] = entries.length;
     terminalRef.current.scrollToBottom();
-  }, [activeAgent, logs]);
+  }, [activeAgent, activeIsInteractive, logs]);
+
+  const handleTabClick = (agentId: string): void => {
+    setActiveAgentId(agentId);
+    const target = agents.find((agent) => agent.id === agentId);
+    if ((target?.mode ?? "exec") === "interactive") {
+      void window.mao.tmux.selectWindow(agentId);
+    }
+  };
 
   return (
     <section className="h-56 border-t border-slate-800 bg-slate-950">
@@ -92,7 +120,7 @@ export default function TerminalPanel(): ReactElement {
             <button
               key={agent.id}
               type="button"
-              onClick={() => setActiveAgentId(agent.id)}
+              onClick={() => handleTabClick(agent.id)}
               className={`rounded px-3 py-1.5 text-xs ${
                 activeAgent?.id === agent.id
                   ? "bg-cyan-500 text-slate-950"
@@ -129,7 +157,16 @@ export default function TerminalPanel(): ReactElement {
         </div>
         <div className="min-h-0 flex-1 overflow-hidden p-2">
           {activeAgent ? (
-            <div ref={containerRef} className="h-full rounded border border-slate-800 bg-slate-950 p-2" />
+            activeIsInteractive && ttydUrl ? (
+              <iframe
+                src={`${ttydUrl}?arg=&fontSize=12`}
+                className="h-full w-full rounded border border-slate-800 bg-slate-950"
+                title={`${activeAgent.name} terminal`}
+                allow="clipboard-read; clipboard-write"
+              />
+            ) : (
+              <div ref={containerRef} className="h-full rounded border border-slate-800 bg-slate-950 p-2" />
+            )
           ) : (
             <div className="flex h-full items-center justify-center rounded border border-slate-800 text-sm text-slate-500">
               Terminal output will appear here.

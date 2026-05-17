@@ -28,6 +28,7 @@ import { AgentRunner } from "./agentRunner";
 import { MCPPermissionServer } from "./mcpPermissionServer";
 import { createShellTestAgent, PtyManager } from "./ptyManager";
 import { TmuxManager } from "./tmuxManager";
+import { TtydManager } from "./ttydManager";
 
 const agentSchema = z.object({
   id: z.string(),
@@ -79,10 +80,12 @@ const tasksSchema = z.array(taskSchema);
 
 const ptyManager = new PtyManager();
 const tmuxManager = new TmuxManager();
+const ttydManager = new TtydManager();
 const agentRunner = new AgentRunner();
 agentRunner.setPtyManager(tmuxManager);
 const mcpPermissionServer = new MCPPermissionServer();
 let didRunSmokeTest = false;
+let didStartTtyd = false;
 const writeLocks = new Map<string, Promise<void>>();
 
 const ensureJsonFile = async <T>(path: string, fallback: T): Promise<void> => {
@@ -381,6 +384,17 @@ const registerIpcHandlers = (): void => {
       return mcpPermissionServer.respond(requestId, decision);
     }
   );
+
+  ipcMain.handle("mao:tty:getUrl" satisfies keyof IpcChannels, async (): ReturnType<IpcChannels["mao:tty:getUrl"]> => {
+    return ttydManager.getUrl();
+  });
+
+  ipcMain.handle(
+    "mao:tmux:selectWindow" satisfies keyof IpcChannels,
+    async (_event, agentId: string): ReturnType<IpcChannels["mao:tmux:selectWindow"]> => {
+      return tmuxManager.selectWindow(agentId);
+    }
+  );
 };
 
 const registerPtyBroadcasts = (): void => {
@@ -413,6 +427,14 @@ const registerPtyBroadcasts = (): void => {
   tmuxManager.on("status", ({ agentId, status }) => {
     for (const browserWindow of BrowserWindow.getAllWindows()) {
       browserWindow.webContents.send("mao:pty:status", { agentId, status });
+    }
+
+    if (status === "running" && !didStartTtyd) {
+      didStartTtyd = true;
+      void ttydManager.start(tmuxManager.getSessionName()).catch((error) => {
+        didStartTtyd = false;
+        console.error("[ttyd] failed to start", error);
+      });
     }
   });
 
@@ -493,5 +515,6 @@ app.on("will-quit", () => {
   ptyManager.killAll();
   tmuxManager.killAll();
   agentRunner.killAll();
+  ttydManager.stop();
   void mcpPermissionServer.stop();
 });

@@ -42,6 +42,12 @@ type MaoApi = {
   log: {
     append: (agentId: string, data: string) => Promise<void>;
   };
+  tty: {
+    getUrl: () => Promise<string | null>;
+  };
+  tmux: {
+    selectWindow: (agentId: string) => Promise<boolean>;
+  };
   permission: {
     respond: (requestId: string, decision: PermissionDecision) => Promise<boolean>;
     onRequest: (callback: (event: PermissionRequestEvent) => void) => () => void;

@@ -190,6 +190,20 @@ export class TmuxManager extends EventEmitter {
     return SESSION_NAME;
   }
 
+  selectWindow(agentId: string): boolean {
+    const windowName = this.agentToWindow.get(agentId);
+    if (!windowName) {
+      return false;
+    }
+
+    try {
+      this.tmux(["select-window", "-t", `${SESSION_NAME}:${windowName}`]);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   getAttachCommand(agentId: string): string | null {
     const windowName = this.agentToWindow.get(agentId);
     if (!windowName) {

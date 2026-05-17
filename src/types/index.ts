@@ -138,6 +138,8 @@ export type IpcChannels = {
   "mao:pty:kill": (agentId: string) => Promise<void>;
   "mao:log:append": (agentId: string, data: string) => Promise<void>;
   "mao:permission:respond": (requestId: string, decision: PermissionDecision) => Promise<boolean>;
+  "mao:tty:getUrl": () => Promise<string | null>;
+  "mao:tmux:selectWindow": (agentId: string) => Promise<boolean>;
 };
 
 export type PtyDataEvent = { agentId: string; data: string };

@@ -53,6 +53,13 @@ Workspace JSON paths are defined in `src/utils/storage.ts` and point to:
 - Node glow: マインドマップ上のノードは状態に応じて光ります。starting は黄色、running はシアン、error は赤です。
 - Terminal input: 最下部 Terminal は入力対応です。interactive mode の承認プロンプトや CLI 入力に直接応答できます。
 
+## Live Terminal
+
+Interactive agents use a real web terminal through ttyd and tmux in the bottom
+Terminal panel. Selecting an interactive agent tab switches the active tmux
+window. Exec agents stay on the lightweight xterm log viewer. You can also
+attach from a native terminal with `tmux attach -t mao-orch`.
+
 ## Permission Flags
 
 - Codex: `--sandbox workspace-write`, `--dangerously-bypass-approvals-and-sandbox`

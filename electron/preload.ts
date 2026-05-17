@@ -47,6 +47,12 @@ contextBridge.exposeInMainWorld("mao", {
   log: {
     append: (agentId: string, data: string): Promise<void> => ipcRenderer.invoke("mao:log:append", agentId, data)
   },
+  tty: {
+    getUrl: (): Promise<string | null> => ipcRenderer.invoke("mao:tty:getUrl")
+  },
+  tmux: {
+    selectWindow: (agentId: string): Promise<boolean> => ipcRenderer.invoke("mao:tmux:selectWindow", agentId)
+  },
   permission: {
     respond: (requestId: string, decision: PermissionDecision): Promise<boolean> =>
       ipcRenderer.invoke("mao:permission:respond", requestId, decision),
