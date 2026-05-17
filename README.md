@@ -51,6 +51,13 @@ Workspace JSON paths are defined in `src/utils/storage.ts` and point to:
 - Project Summary: 左上の "Project Summary" ボタンから、プロジェクト全体の前提や方針を Markdown テキストとして編集できます。
 - Agent History: Inspector の "直近の応答履歴" で、選択中エージェントの最近の入力、応答、dispatch 数を確認できます。
 - Node glow: マインドマップ上のノードは状態に応じて光ります。starting は黄色、running はシアン、error は赤です。
+- Terminal input: 最下部 Terminal は入力対応です。interactive mode の承認プロンプトや CLI 入力に直接応答できます。
+
+## Permission Flags
+
+- Codex: `--sandbox workspace-write`, `--dangerously-bypass-approvals-and-sandbox`
+- Claude: `--permission-mode acceptEdits`, `--dangerously-skip-permissions`
+- Grok/custom: 利用中 CLI のドキュメントに従って Args に追加してください。
 
 ## Troubleshooting
 

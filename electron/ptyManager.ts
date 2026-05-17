@@ -125,6 +125,10 @@ export class PtyManager extends EventEmitter {
     managed.process.write(data);
   }
 
+  has(agentId: string): boolean {
+    return this.processes.has(agentId);
+  }
+
   kill(agentId: string): void {
     const managed = this.processes.get(agentId);
     if (!managed) {
