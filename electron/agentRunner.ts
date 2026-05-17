@@ -6,6 +6,7 @@ import fs from "fs-extra";
 import * as pty from "node-pty";
 import type {
   Agent,
+  AgentMode,
   AgentRunRequest,
   AgentRunResult,
   ContextSnapshot,
@@ -58,7 +59,7 @@ const detectCliMode = (commandName: string): CliMode => {
 const flattenExtraArgs = (args: string[] | undefined): string[] =>
   (args ?? []).flatMap((arg) => arg.split(/\s+/)).filter((arg) => arg.length > 0);
 
-const buildPolicyArgs = (mode: CliMode, policy: PermissionPolicy): string[] => {
+const buildPolicyArgs = (mode: CliMode, agentMode: AgentMode, policy: PermissionPolicy): string[] => {
   if (policy === "safe-auto") {
     if (mode === "codex") {
       return ["--sandbox", "workspace-write"];
@@ -88,6 +89,19 @@ const buildPolicyArgs = (mode: CliMode, policy: PermissionPolicy): string[] => {
       return ["--yolo"];
     }
 
+    return [];
+  }
+
+  if (policy === "ask") {
+    // codex のデフォルト approval_policy はゆるく、何もしないと TUI でも黙って実行される。
+    // interactive モードのときだけ「全コマンド承認待ち」に強制し、sandbox は承認後の動作を妨げないよう
+    // danger-full-access にする (sandbox 制限は yolo/safe-auto と直交的な保護なので、ask では承認に委ねる)。
+    // exec モードは codex 自体が approval: never に固定されているため、ここで送ってもハングするだけで意味がない。
+    if (mode === "codex" && agentMode === "interactive") {
+      return ["-c", 'approval_policy="untrusted"', "--sandbox", "danger-full-access"];
+    }
+    // claude は MCP の --permission-prompt-tool 側で扱う (run() で別途注入)
+    // gemini / grok / stdin-generic は CLI の TUI 既定に任せる
     return [];
   }
 
@@ -274,7 +288,7 @@ export class AgentRunner extends EventEmitter {
     const fullPrompt = composePrompt(agent, req.body, req.context);
     const mode = detectCliMode(commandName);
     const policy = agent.permissionPolicy ?? "safe-auto";
-    const policyArgs = buildPolicyArgs(mode, policy);
+    const policyArgs = buildPolicyArgs(mode, agent.mode ?? "exec", policy);
     const cleanupFiles: string[] = [];
     let extraEnv: Record<string, string> = {};
     let extraInjectedArgs: string[] = [];
