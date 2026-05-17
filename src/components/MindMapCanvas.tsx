@@ -55,8 +55,7 @@ export default function MindMapCanvas(): ReactElement {
         source: edge.source,
         target: edge.target,
         type: "smoothstep",
-        markerEnd: { type: MarkerType.ArrowClosed },
-        style: { stroke: "#64748b" }
+        markerEnd: { type: MarkerType.ArrowClosed }
       })),
     [graphEdges]
   );

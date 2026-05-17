@@ -37,3 +37,24 @@ body {
 .mao-node-error {
   box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.9);
 }
+
+/* edges */
+.react-flow__edge .react-flow__edge-path {
+  stroke: #64748b;
+  stroke-width: 1.5;
+  transition: stroke 0.12s ease, stroke-width 0.12s ease;
+}
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke: #94a3b8;
+  stroke-width: 2.5;
+}
+.react-flow__edge.selected .react-flow__edge-path,
+.react-flow__edge:focus .react-flow__edge-path,
+.react-flow__edge:focus-visible .react-flow__edge-path {
+  stroke: #22d3ee;
+  stroke-width: 3;
+}
+.react-flow__edge.selected .react-flow__arrowhead,
+.react-flow__edge:focus .react-flow__arrowhead {
+  fill: #22d3ee;
+}
