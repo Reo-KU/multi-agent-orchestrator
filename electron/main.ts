@@ -27,6 +27,7 @@ import { maskSecrets } from "../src/utils/maskSecrets";
 import { AgentRunner } from "./agentRunner";
 import { MCPPermissionServer } from "./mcpPermissionServer";
 import { createShellTestAgent, PtyManager } from "./ptyManager";
+import { TmuxManager } from "./tmuxManager";
 
 const agentSchema = z.object({
   id: z.string(),
@@ -77,8 +78,9 @@ const agentsSchema = z.array(agentSchema);
 const tasksSchema = z.array(taskSchema);
 
 const ptyManager = new PtyManager();
+const tmuxManager = new TmuxManager();
 const agentRunner = new AgentRunner();
-agentRunner.setPtyManager(ptyManager);
+agentRunner.setPtyManager(tmuxManager);
 const mcpPermissionServer = new MCPPermissionServer();
 let didRunSmokeTest = false;
 const writeLocks = new Map<string, Promise<void>>();
@@ -192,6 +194,8 @@ const registerIpcHandlers = (): void => {
         );
       });
       ptyManager.kill(id);
+      tmuxManager.kill(id);
+      agentRunner.kill(id);
     }
   );
 
@@ -315,7 +319,7 @@ const registerIpcHandlers = (): void => {
         return { ok: false, error: `Agent not found: ${agentId}` };
       }
 
-      const result = ptyManager.spawn(agent);
+      const result = (agent.mode ?? "exec") === "interactive" ? tmuxManager.spawn(agent) : ptyManager.spawn(agent);
       if (!result.ok) {
         return { ok: false, error: result.error };
       }
@@ -332,6 +336,11 @@ const registerIpcHandlers = (): void => {
         return;
       }
 
+      if (tmuxManager.has(agentId)) {
+        tmuxManager.write(agentId, data);
+        return;
+      }
+
       agentRunner.write(agentId, data);
     }
   );
@@ -341,6 +350,11 @@ const registerIpcHandlers = (): void => {
     async (_event, agentId: string): ReturnType<IpcChannels["mao:pty:kill"]> => {
       if (ptyManager.has(agentId)) {
         ptyManager.kill(agentId);
+        return;
+      }
+
+      if (tmuxManager.has(agentId)) {
+        tmuxManager.kill(agentId);
         return;
       }
 
@@ -383,6 +397,20 @@ const registerPtyBroadcasts = (): void => {
   });
 
   ptyManager.on("status", ({ agentId, status }) => {
+    for (const browserWindow of BrowserWindow.getAllWindows()) {
+      browserWindow.webContents.send("mao:pty:status", { agentId, status });
+    }
+  });
+
+  tmuxManager.on("data", ({ agentId, data }) => {
+    const maskedData = maskSecrets(data);
+
+    for (const browserWindow of BrowserWindow.getAllWindows()) {
+      browserWindow.webContents.send("mao:pty:data", { agentId, data: maskedData });
+    }
+  });
+
+  tmuxManager.on("status", ({ agentId, status }) => {
     for (const browserWindow of BrowserWindow.getAllWindows()) {
       browserWindow.webContents.send("mao:pty:status", { agentId, status });
     }
@@ -463,6 +491,7 @@ app.on("window-all-closed", () => {
 
 app.on("will-quit", () => {
   ptyManager.killAll();
+  tmuxManager.killAll();
   agentRunner.killAll();
   void mcpPermissionServer.stop();
 });

@@ -17,7 +17,6 @@ import type {
 } from "../src/types";
 import { TASK_SIGNALS_PATH } from "../src/utils/storage";
 import { stripAnsi } from "../src/utils/stripAnsi";
-import type { PtyManager } from "./ptyManager";
 
 type AgentRunnerEvents = {
   data: [PtyDataEvent];
@@ -26,6 +25,15 @@ type AgentRunnerEvents = {
 
 type CliMode = "codex" | "claude" | "grok" | "gemini" | "stdin-generic";
 type CaptureStrategy = "file" | "stdout";
+export type PtyBackend = {
+  has(agentId: string): boolean;
+  spawn(agent: Agent): { ok: true } | { ok: false; error: string };
+  write(agentId: string, data: string): void;
+  kill(agentId: string): boolean | void;
+  killAll(): void;
+  on(eventName: "data", listener: (event: PtyDataEvent) => void): unknown;
+  on(eventName: "status", listener: (event: PtyStatusEvent) => void): unknown;
+};
 
 const ALLOWED_COMMANDS = new Set(["claude", "codex", "grok", "gemini", "sh", "bash", "zsh", "python", "python3", "node"]);
 
@@ -270,7 +278,7 @@ export declare interface AgentRunner {
 export class AgentRunner extends EventEmitter {
   private readonly activePtys = new Map<string, pty.IPty>();
   private readonly interactiveBuffers = new Map<string, string>();
-  private ptyManager: PtyManager | null = null;
+  private ptyBackend: PtyBackend | null = null;
   private isPtyManagerSubscribed = false;
   private mcpPermissionPort = 0;
 
@@ -278,15 +286,15 @@ export class AgentRunner extends EventEmitter {
     this.mcpPermissionPort = port;
   }
 
-  setPtyManager(ptyManager: PtyManager): void {
-    this.ptyManager = ptyManager;
+  setPtyManager(backend: PtyBackend): void {
+    this.ptyBackend = backend;
 
     if (this.isPtyManagerSubscribed) {
       return;
     }
 
     this.isPtyManagerSubscribed = true;
-    ptyManager.on("data", ({ agentId, data }) => {
+    backend.on("data", ({ agentId, data }) => {
       const current = this.interactiveBuffers.get(agentId);
       if (current !== undefined) {
         this.interactiveBuffers.set(agentId, current + data);
@@ -428,8 +436,8 @@ export class AgentRunner extends EventEmitter {
   }
 
   async runInteractive(req: AgentRunRequest, agent: Agent): Promise<AgentRunResult> {
-    if (!this.ptyManager) {
-      return { ok: false, error: "PtyManager not configured for AgentRunner" };
+    if (!this.ptyBackend) {
+      return { ok: false, error: "PTY backend not configured for AgentRunner" };
     }
 
     const commandName = getCommandName(agent.command ?? "");
@@ -442,8 +450,8 @@ export class AgentRunner extends EventEmitter {
       return { ok: false, error: `workingDirectory does not exist: ${workingDirectory}` };
     }
 
-    if (!this.ptyManager.has(agent.id)) {
-      const spawnResult = this.ptyManager.spawn(agent);
+    if (!this.ptyBackend.has(agent.id)) {
+      const spawnResult = this.ptyBackend.spawn(agent);
       if (!spawnResult.ok) {
         return { ok: false, error: spawnResult.error };
       }
@@ -452,26 +460,28 @@ export class AgentRunner extends EventEmitter {
     }
 
     const taskCallId = randomUUID();
-    const signalLine = `MAO_TASK_DONE\t${taskCallId}`;
+    // 区切り文字を入れない単一トークン。エスケープに依存しないので printf/echo どちらでも壊れない。
+    const signalToken = `MAO_DONE_${taskCallId}`;
     const basePrompt = composePrompt(agent, req.body, req.context);
     const signalInstruction = [
       "",
       "## MAO 完了通知 (必須・厳守)",
-      "上記タスクの応答が完了したら、必ず最後に以下を shell で実行してください:",
+      "上記タスクの応答が完了したら、必ず最後に以下を shell で1行だけ実行してください:",
       "",
-      `  echo -e "${signalLine}\\t$(date -u +%FT%TZ)" >> ${TASK_SIGNALS_PATH}`,
+      `  echo "${signalToken}" >> "${TASK_SIGNALS_PATH}"`,
       "",
-      "これを実行しないと MAO はタスク完了を検知できず、後続の処理が始まりません。",
-      "[TO: ...] ブロックがある場合は応答中に出力し、その後に上の signal を出してください。"
+      "このコマンドの実行を MAO はタスク完了の signal として検知します。",
+      "実行しないと MAO は完了を検知できず、最大5分タイムアウト待ちになります。",
+      "[TO: ...] ブロックがある場合は応答中に出力し、その後に上記の echo を出してください。"
     ].join("\n");
     const fullPrompt = `${basePrompt}\n\n${signalInstruction}`;
 
     this.interactiveBuffers.set(agent.id, "");
     this.emit("status", { agentId: agent.id, status: "running" });
 
-    this.ptyManager.write(agent.id, fullPrompt);
+    this.ptyBackend.write(agent.id, fullPrompt);
     await new Promise((resolve) => setTimeout(resolve, 600));
-    this.ptyManager.write(agent.id, "\r");
+    this.ptyBackend.write(agent.id, "\r");
 
     const startedAt = Date.now();
     const timeoutMs = 5 * 60 * 1000;
@@ -482,7 +492,7 @@ export class AgentRunner extends EventEmitter {
 
       try {
         const content = await fs.readFile(TASK_SIGNALS_PATH, "utf8");
-        if (content.includes(`MAO_TASK_DONE\t${taskCallId}`)) {
+        if (content.includes(signalToken)) {
           signaledAt = Date.now();
           break;
         }
@@ -499,14 +509,14 @@ export class AgentRunner extends EventEmitter {
     if (!signaledAt) {
       return {
         ok: false,
-        error: `Timeout waiting for MAO_TASK_DONE signal after ${Math.round(
+        error: `Timeout waiting for ${signalToken} after ${Math.round(
           elapsedMs / 1000
         )}s. Buffer length: ${buffer.length}`
       };
     }
 
     const cleanBuffer = stripAnsi(buffer);
-    const signalIndex = cleanBuffer.lastIndexOf("MAO_TASK_DONE");
+    const signalIndex = cleanBuffer.lastIndexOf(signalToken);
     const lastMessage = (signalIndex > 0 ? cleanBuffer.slice(0, signalIndex) : cleanBuffer).trim();
 
     return {
