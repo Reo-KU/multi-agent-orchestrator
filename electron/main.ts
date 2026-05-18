@@ -11,6 +11,7 @@ import type {
   GraphEdge,
   GraphNode,
   IpcChannels,
+  InstallResult,
   PermissionDecision,
   Task
 } from "../src/types";
@@ -25,6 +26,7 @@ import {
 } from "../src/utils/storage";
 import { maskSecrets } from "../src/utils/maskSecrets";
 import { AgentRunner } from "./agentRunner";
+import { Installer } from "./installer";
 import { MCPPermissionServer } from "./mcpPermissionServer";
 import { createShellTestAgent, PtyManager } from "./ptyManager";
 import { runSetupCheck } from "./systemCheck";
@@ -82,6 +84,7 @@ const tasksSchema = z.array(taskSchema);
 const ptyManager = new PtyManager();
 const tmuxManager = new TmuxManager();
 const ttydManager = new TtydManager();
+const installer = new Installer();
 const agentRunner = new AgentRunner();
 agentRunner.setPtyManager(tmuxManager);
 const mcpPermissionServer = new MCPPermissionServer();
@@ -400,6 +403,47 @@ const registerIpcHandlers = (): void => {
   ipcMain.handle("mao:setup:check" satisfies keyof IpcChannels, async (): ReturnType<IpcChannels["mao:setup:check"]> => {
     return runSetupCheck();
   });
+
+  ipcMain.handle(
+    "mao:setup:install" satisfies keyof IpcChannels,
+    async (_event, toolName: string): ReturnType<IpcChannels["mao:setup:install"]> => {
+      const check = await runSetupCheck();
+      const tool = check.tools.find((item) => item.name === toolName);
+
+      if (!tool) {
+        return { ok: false, error: `Unknown tool: ${toolName}` } satisfies InstallResult;
+      }
+
+      if (tool.available) {
+        return { ok: true, alreadyInstalled: true } satisfies InstallResult;
+      }
+
+      if (!tool.autoInstall) {
+        return {
+          ok: false,
+          error: `No auto-install available for ${toolName}. Please install manually.`
+        } satisfies InstallResult;
+      }
+
+      try {
+        const result = await installer.run(toolName, tool.autoInstall.command, tool.autoInstall.args);
+        if (result.code === 0) {
+          return { ok: true, exitCode: result.code } satisfies InstallResult;
+        }
+
+        return { ok: false, error: `${toolName} install failed with exit code ${result.code}` } satisfies InstallResult;
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) } satisfies InstallResult;
+      }
+    }
+  );
+
+  ipcMain.handle(
+    "mao:setup:installCancel" satisfies keyof IpcChannels,
+    async (_event, toolName: string): ReturnType<IpcChannels["mao:setup:installCancel"]> => {
+      return installer.cancel(toolName);
+    }
+  );
 };
 
 const registerPtyBroadcasts = (): void => {
@@ -460,6 +504,12 @@ const registerPtyBroadcasts = (): void => {
   mcpPermissionServer.on("request", (payload) => {
     for (const browserWindow of BrowserWindow.getAllWindows()) {
       browserWindow.webContents.send("mao:permission:request", payload);
+    }
+  });
+
+  installer.on("event", (payload) => {
+    for (const browserWindow of BrowserWindow.getAllWindows()) {
+      browserWindow.webContents.send("mao:setup:installProgress", payload);
     }
   });
 };

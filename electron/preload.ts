@@ -7,6 +7,8 @@ import type {
   AgentSummary,
   GraphEdge,
   GraphNode,
+  InstallProgress,
+  InstallResult,
   PermissionDecision,
   PermissionRequestEvent,
   PtyDataEvent,
@@ -55,7 +57,17 @@ contextBridge.exposeInMainWorld("mao", {
     selectWindow: (agentId: string): Promise<boolean> => ipcRenderer.invoke("mao:tmux:selectWindow", agentId)
   },
   setup: {
-    check: (): Promise<SetupCheckResult> => ipcRenderer.invoke("mao:setup:check")
+    check: (): Promise<SetupCheckResult> => ipcRenderer.invoke("mao:setup:check"),
+    install: (toolName: string): Promise<InstallResult> => ipcRenderer.invoke("mao:setup:install", toolName),
+    installCancel: (toolName: string): Promise<boolean> => ipcRenderer.invoke("mao:setup:installCancel", toolName),
+    onInstallProgress: (callback: (progress: InstallProgress) => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, payload: InstallProgress): void => {
+        callback(payload);
+      };
+
+      ipcRenderer.on("mao:setup:installProgress", listener);
+      return () => ipcRenderer.off("mao:setup:installProgress", listener);
+    }
   },
   permission: {
     respond: (requestId: string, decision: PermissionDecision): Promise<boolean> =>

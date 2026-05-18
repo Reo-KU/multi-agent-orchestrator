@@ -4,7 +4,10 @@ import type { SetupCheckResult, ToolInfo } from "../src/types";
 
 const exec = promisify(execFile);
 
-const checks: Array<Omit<ToolInfo, "available" | "version">> = [
+type AutoInstallCommand = { command: string; args: string[] };
+type ToolSpec = Omit<ToolInfo, "available" | "version" | "autoInstall">;
+
+const checks: ToolSpec[] = [
   {
     name: "node",
     category: "required",
@@ -99,12 +102,60 @@ async function probe(name: string): Promise<{ available: boolean; version: strin
   }
 }
 
+async function hasExecutable(name: string): Promise<boolean> {
+  const finder = process.platform === "win32" ? "where" : "which";
+
+  try {
+    await exec(finder, [name]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function getAutoInstall(toolName: string): Promise<AutoInstallCommand | null> {
+  const hasBrew = process.platform === "darwin" ? await hasExecutable("brew") : false;
+  const hasNpm = await hasExecutable("npm");
+
+  if (process.platform === "darwin") {
+    if (toolName === "tmux" && hasBrew) {
+      return { command: "brew", args: ["install", "tmux"] };
+    }
+
+    if (toolName === "ttyd" && hasBrew) {
+      return { command: "brew", args: ["install", "ttyd"] };
+    }
+
+    if (toolName === "claude" && hasNpm) {
+      return { command: "npm", args: ["install", "-g", "@anthropic-ai/claude-code"] };
+    }
+
+    if (toolName === "gemini" && hasNpm) {
+      return { command: "npm", args: ["install", "-g", "@google/gemini-cli"] };
+    }
+
+    return null;
+  }
+
+  if (process.platform === "linux") {
+    if (toolName === "claude" && hasNpm) {
+      return { command: "npm", args: ["install", "-g", "@anthropic-ai/claude-code"] };
+    }
+
+    if (toolName === "gemini" && hasNpm) {
+      return { command: "npm", args: ["install", "-g", "@google/gemini-cli"] };
+    }
+  }
+
+  return null;
+}
+
 export async function runSetupCheck(): Promise<SetupCheckResult> {
   const tools: ToolInfo[] = [];
 
   for (const spec of checks) {
     const { available, version } = await probe(spec.name);
-    tools.push({ ...spec, available, version });
+    tools.push({ ...spec, available, version, autoInstall: await getAutoInstall(spec.name) });
   }
 
   return {

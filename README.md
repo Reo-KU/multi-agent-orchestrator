@@ -114,6 +114,13 @@ Workspace JSON paths are defined in `src/utils/storage.ts` and point to:
 - Root agent: マインドマップ上の User ノードからエージェントへ線を引くと、そのエージェントが root になります。User から root へのシアン破線は表示専用で、`graph.json` には保存されません。
 - Terminal input: 最下部 Terminal は入力対応です。interactive mode の承認プロンプトや CLI 入力に直接応答できます。
 
+## Setup Check
+
+On startup, MAO checks required tools such as tmux and ttyd. If anything is
+missing, the setup modal shows install commands. Tools that support automatic
+installation include an Install button with live output; otherwise use Copy and
+run the command manually in your terminal.
+
 ## Live Terminal
 
 Interactive agents use a real web terminal through ttyd and tmux in the bottom

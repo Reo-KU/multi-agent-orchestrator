@@ -134,12 +134,27 @@ export type ToolInfo = {
     win32: string;
     linux: string;
   };
+  autoInstall: { command: string; args: string[] } | null;
 };
 
 export type SetupCheckResult = {
   platform: "darwin" | "win32" | "linux" | string;
   tools: ToolInfo[];
 };
+
+export type InstallEvent =
+  | { type: "stdout"; chunk: string }
+  | { type: "stderr"; chunk: string }
+  | { type: "exit"; code: number | null };
+
+export type InstallProgress = {
+  toolName: string;
+  event: InstallEvent;
+};
+
+export type InstallResult =
+  | { ok: true; alreadyInstalled?: boolean; exitCode?: number | null }
+  | { ok: false; error: string };
 
 // IPC 契約 — Pane2(frontend) と Pane3(backend) はこれをimportして使う
 export type IpcChannels = {
@@ -163,6 +178,8 @@ export type IpcChannels = {
   "mao:tty:getUrl": () => Promise<string | null>;
   "mao:tmux:selectWindow": (agentId: string) => Promise<boolean>;
   "mao:setup:check": () => Promise<SetupCheckResult>;
+  "mao:setup:install": (toolName: string) => Promise<InstallResult>;
+  "mao:setup:installCancel": (toolName: string) => Promise<boolean>;
 };
 
 export type PtyDataEvent = { agentId: string; data: string };

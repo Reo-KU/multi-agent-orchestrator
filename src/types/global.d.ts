@@ -6,6 +6,8 @@ import type {
   AgentSummary,
   GraphEdge,
   GraphNode,
+  InstallProgress,
+  InstallResult,
   PermissionDecision,
   PermissionRequestEvent,
   PtyDataEvent,
@@ -51,6 +53,9 @@ type MaoApi = {
   };
   setup: {
     check: () => Promise<SetupCheckResult>;
+    install: (toolName: string) => Promise<InstallResult>;
+    installCancel: (toolName: string) => Promise<boolean>;
+    onInstallProgress: (callback: (progress: InstallProgress) => void) => () => void;
   };
   permission: {
     respond: (requestId: string, decision: PermissionDecision) => Promise<boolean>;

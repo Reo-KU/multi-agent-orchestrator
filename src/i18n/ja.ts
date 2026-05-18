@@ -140,6 +140,7 @@ export const ja: Translations = {
     platformMac: "ターミナルを開いて、不足しているインストールコマンドを実行してください。",
     platformWin: "コマンドプロンプト (必要に応じて管理者) または PowerShell を開いて、不足しているインストールコマンドを実行してください。",
     platformLinux: "ターミナルを開いて、パッケージマネージャから不足分をインストールしてください。",
+    installGuide: "Install ボタンで MAO が裏側で実行します。手動でやりたい場合は Copy してターミナルへ。",
     missingRequired: (n: number) => `${n} 個の必須ツールが見つかりません。MAO が正常に動作しない可能性があります。`,
     allRequiredOk: "必須ツールはすべて揃っています。",
     requiredHeader: "必須",
@@ -148,6 +149,10 @@ export const ja: Translations = {
     rechecking: "再チェック中...",
     continueAnyway: "そのまま続ける",
     close: "閉じる",
-    copy: "コピー"
+    copy: "コピー",
+    install: "Install",
+    installing: "インストール中...",
+    installSuccess: "✓ インストール成功。Re-check を押してください。",
+    installFailed: (code: number) => `インストール失敗 (exit ${code})。ターミナルで手動実行を試してください。`
   }
 };

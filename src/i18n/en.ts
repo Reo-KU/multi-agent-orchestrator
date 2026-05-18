@@ -138,6 +138,7 @@ export const en = {
     platformMac: "Open Terminal and run the missing install commands.",
     platformWin: "Open Command Prompt or PowerShell as Administrator if needed, then run the missing install commands.",
     platformLinux: "Open your terminal and install the missing tools via your package manager.",
+    installGuide: "Click Install to let MAO run the command for you, or Copy to run it manually in Terminal.",
     missingRequired: (n: number) => `${n} required tool(s) are missing. MAO may not start correctly until you install them.`,
     allRequiredOk: "All required tools are present.",
     requiredHeader: "Required",
@@ -146,7 +147,11 @@ export const en = {
     rechecking: "Re-checking...",
     continueAnyway: "Continue anyway",
     close: "Close",
-    copy: "Copy"
+    copy: "Copy",
+    install: "Install",
+    installing: "Installing...",
+    installSuccess: "✓ Installed successfully. Click Re-check.",
+    installFailed: (code: number) => `Install failed (exit ${code}). Try the command manually in your terminal.`
   }
 };
 
