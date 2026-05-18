@@ -1,10 +1,68 @@
 # Multi-Agent CLI Orchestrator
 
-Electron + Vite + React + TypeScript scaffold for the Multi-Agent CLI Orchestrator MVP.
+Desktop app to orchestrate multiple CLI agents (Claude Code / OpenAI Codex /
+Gemini CLI / Grok / any custom CLI) as a mindmap with per-agent permission
+policies, an embedded web terminal, and a tmux-attachable backend.
+
+> ⚠️ **MAO does not bundle the agent CLIs.** It just spawns whatever
+> `command` you tell each agent to run. You need to install the CLIs you
+> want to drive separately (see Prerequisites).
+
+## Prerequisites
+
+### 1. Required system tools
+
+MAO needs Node.js, plus two system binaries for the interactive-mode
+backend.
+
+| Tool | macOS install | Why |
+|---|---|---|
+| Node.js 20+ | `brew install node` or `nvm install --lts` | Runtime for the app and the renderer |
+| **tmux** | `brew install tmux` | All interactive-mode agents live in a tmux session (`mao-orch`). |
+| **ttyd** | `brew install ttyd` | Renders the live tmux session as the embedded web terminal in the bottom panel. |
+
+Linux: install the equivalents through apt / dnf / pacman. Windows is
+untested.
+
+### 2. Agent CLIs (install whichever you plan to use)
+
+You only need the CLIs you will actually attach to an agent. MAO's
+`allowlist` accepts `claude`, `codex`, `grok`, `gemini`, plus shells
+(`sh` / `bash` / `zsh`) and `python` / `python3` / `node` for custom
+agents.
+
+| Agent type | Suggested install | Auth |
+|---|---|---|
+| `claude` | `npm install -g @anthropic-ai/claude-code` (or the official installer) | run `claude` once and log in |
+| `codex` | follow [openai/codex](https://github.com/openai/codex) install instructions | `codex login` |
+| `gemini` | `npm install -g @google/gemini-cli` | `gemini` interactive setup |
+| `grok` | xAI's `grok-cli` (project-specific) | depends |
+| `custom` | anything from the allowlist that takes a prompt | depends |
+
+Verify before launching MAO:
+
+```sh
+which tmux ttyd node
+which claude codex gemini   # only those you installed
+```
+
+If MAO tries to spawn an agent whose `command` isn't in the allowlist or
+isn't on `PATH`, it surfaces "Command not in allowlist" or
+"posix_spawnp failed" in the agent status — no silent failure, but the
+agent won't run.
+
+### 3. (Optional) Per-CLI authentication
+
+Each agent CLI manages its own credentials. MAO doesn't proxy logins; it
+just spawns the CLI in its working directory and assumes the CLI is
+already authenticated. Run each CLI manually once before adding it as an
+agent.
 
 ## Setup
 
 ```sh
+git clone https://github.com/Reo-KU/multi-agent-orchestrator.git
+cd multi-agent-orchestrator
 npm install
 ```
 
