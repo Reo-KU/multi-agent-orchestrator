@@ -13,7 +13,11 @@ import ReactFlow, {
 import "reactflow/dist/style.css";
 import { getTranslations } from "../i18n";
 import { useAppStore } from "../store/useAppStore";
-import type { Agent } from "../types";
+import type { Agent, AgentLocale } from "../types";
+
+const USER_NODE_ID = "__mao_user__";
+const USER_EDGE_ID = "__user_to_root__";
+const userPosition = { x: -200, y: -100 };
 
 export default function MindMapCanvas(): ReactElement {
   const agents = useAppStore((state) => state.agents);
@@ -30,9 +34,18 @@ export default function MindMapCanvas(): ReactElement {
 
   const agentById = useMemo(() => new Map(agents.map((agent) => [agent.id, agent])), [agents]);
 
-  const nodes: Node<AgentNodeData>[] = useMemo(
-    () =>
-      graphNodes.map((node) => {
+  const nodes: Node<AgentNodeData | UserNodeData>[] = useMemo(
+    () => {
+      const userNode: Node<UserNodeData> = {
+        id: USER_NODE_ID,
+        type: "user",
+        position: userPosition,
+        data: { locale },
+        draggable: true,
+        deletable: false,
+        selectable: false
+      };
+      const agentNodes: Node<AgentNodeData>[] = graphNodes.map((node) => {
         const agent = agentById.get(node.agentId);
         return {
           id: node.id,
@@ -47,25 +60,51 @@ export default function MindMapCanvas(): ReactElement {
             locale
           }
         };
-      }),
+      });
+      return [userNode, ...agentNodes];
+    },
     [agentById, graphNodes, locale, removeNode, selectedNodeId, setRoot]
   );
 
-  const edges: Edge[] = useMemo(
-    () =>
-      graphEdges.map((edge) => ({
+  const edges: Edge[] = useMemo(() => {
+    const rootNode = graphNodes.find((node) => node.isRoot);
+    const virtualEdges: Edge[] = rootNode
+      ? [
+          {
+            id: USER_EDGE_ID,
+            source: USER_NODE_ID,
+            target: rootNode.id,
+            type: "smoothstep",
+            markerEnd: { type: MarkerType.ArrowClosed },
+            style: { stroke: "#22d3ee", strokeWidth: 2.5, strokeDasharray: "4 2" }
+          }
+        ]
+      : [];
+    const realEdges = graphEdges.map((edge) => ({
         id: edge.id,
         source: edge.source,
         target: edge.target,
         type: "smoothstep",
         markerEnd: { type: MarkerType.ArrowClosed }
-      })),
-    [graphEdges]
-  );
+      }));
+    return [...virtualEdges, ...realEdges];
+  }, [graphEdges, graphNodes]);
 
   const onConnect = (connection: Connection): void => {
+    if (connection.source === USER_NODE_ID && connection.target) {
+      void setRoot(connection.target);
+      return;
+    }
+    if (connection.target === USER_NODE_ID) return;
     if (connection.source && connection.target) {
       void connectNodes(connection.source, connection.target);
+    }
+  };
+
+  const handleEdgesDelete = (deleted: Edge[]): void => {
+    for (const edge of deleted) {
+      if (edge.id === USER_EDGE_ID) continue;
+      void removeEdge(edge.id);
     }
   };
 
@@ -77,11 +116,15 @@ export default function MindMapCanvas(): ReactElement {
         nodeTypes={nodeTypes}
         fitView
         deleteKeyCode={["Backspace", "Delete"]}
-        onNodeClick={(_, node) => selectNode(node.id)}
+        onNodeClick={(_, node) => {
+          if (node.id !== USER_NODE_ID) selectNode(node.id);
+        }}
         onPaneClick={() => selectNode(null)}
-        onNodeDragStop={(_, node) => updateNodePosition(node.id, node.position)}
+        onNodeDragStop={(_, node) => {
+          if (node.id !== USER_NODE_ID) updateNodePosition(node.id, node.position);
+        }}
         onConnect={onConnect}
-        onEdgesDelete={(deleted) => deleted.forEach((edge) => void removeEdge(edge.id))}
+        onEdgesDelete={handleEdgesDelete}
       >
         <Background color="#334155" gap={24} />
         <Controls className="!border-slate-700 !bg-slate-900 !shadow-none [&_button]:!border-slate-700 [&_button]:!bg-slate-900 [&_button]:!fill-slate-100" />
@@ -95,7 +138,11 @@ type AgentNodeData = {
   isRoot: boolean;
   onSetRoot: () => void;
   onDelete: () => void;
-  locale: "en" | "ja";
+  locale: AgentLocale;
+};
+
+type UserNodeData = {
+  locale: AgentLocale;
 };
 
 const nodeTypes = {
@@ -154,6 +201,19 @@ const nodeTypes = {
             {t.mindMap.deleteNode}
           </button>
         </div>
+        <Handle type="source" position={Position.Bottom} className="!bg-cyan-400" />
+      </div>
+    );
+  }),
+  user: memo(function UserNode({ data }: NodeProps<UserNodeData>): ReactElement {
+    const t = getTranslations(data.locale);
+    return (
+      <div
+        className="flex w-32 flex-col items-center gap-1 rounded-full border-2 border-cyan-500 bg-cyan-950/70 px-4 py-3 text-cyan-100 shadow-lg"
+        title={t.mindMap.userHint}
+      >
+        <span className="text-2xl">👤</span>
+        <span className="text-xs font-medium">{t.mindMap.user}</span>
         <Handle type="source" position={Position.Bottom} className="!bg-cyan-400" />
       </div>
     );

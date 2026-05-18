@@ -115,6 +115,10 @@ JSON は手動編集も可能 (zod で検証され、不正なら空配列で初
   最近の入力・応答・dispatch 数を確認可能。
 - **Node glow**: マインドマップ上のノードは状態に応じて光る。starting=黄、
   running=シアン、error=赤。
+- **Root agent**: マインドマップ左上に固定で表示される 👤 User ノードから
+  任意のエージェントへ線を引くと、そのエージェントが自動で root になります。
+  User → root のシアン破線は表示専用 (`graph.json` には保存されない)。
+  互換のため Inspector / ノードカードの "Set as Root" ボタンも引き続き使えます。
 - **Terminal input**: 最下部 Terminal は入力対応。interactive mode の承認
   プロンプトに直接タイプで応答できる。
 - **言語切替**: ヘッダー右上の `EN / 日本語` セレクタで UI とエージェントへの

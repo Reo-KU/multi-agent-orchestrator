@@ -84,7 +84,9 @@ export const en = {
     setAsRoot: "Set as Root",
     deleteNode: "Delete Node",
     missingAgent: "Missing agent",
-    root: "Root"
+    root: "Root",
+    user: "User",
+    userHint: "Drag from this node to an agent to make it the root."
   },
   taskInput: {
     label: "Task",

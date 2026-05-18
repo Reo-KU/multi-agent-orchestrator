@@ -86,7 +86,9 @@ export const ja: Translations = {
     setAsRoot: "Set as Root",
     deleteNode: "Delete Node",
     missingAgent: "Missing agent",
-    root: "Root"
+    root: "Root",
+    user: "ユーザー",
+    userHint: "このノードからエージェントに線を引くと、そのエージェントが root になります。"
   },
   taskInput: {
     label: "Task",

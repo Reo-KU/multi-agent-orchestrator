@@ -111,6 +111,7 @@ Workspace JSON paths are defined in `src/utils/storage.ts` and point to:
 - Project Summary: 左上の "Project Summary" ボタンから、プロジェクト全体の前提や方針を Markdown テキストとして編集できます。
 - Agent History: Inspector の "直近の応答履歴" で、選択中エージェントの最近の入力、応答、dispatch 数を確認できます。
 - Node glow: マインドマップ上のノードは状態に応じて光ります。starting は黄色、running はシアン、error は赤です。
+- Root agent: マインドマップ上の User ノードからエージェントへ線を引くと、そのエージェントが root になります。User から root へのシアン破線は表示専用で、`graph.json` には保存されません。
 - Terminal input: 最下部 Terminal は入力対応です。interactive mode の承認プロンプトや CLI 入力に直接応答できます。
 
 ## Live Terminal
