@@ -4,6 +4,8 @@ Desktop app to orchestrate multiple CLI agents (Claude Code / OpenAI Codex /
 Gemini CLI / Grok / any custom CLI) as a mindmap with per-agent permission
 policies, an embedded web terminal, and a tmux-attachable backend.
 
+> 日本語版: [README.ja.md](README.ja.md)
+
 > ⚠️ **MAO does not bundle the agent CLIs.** It just spawns whatever
 > `command` you tell each agent to run. You need to install the CLIs you
 > want to drive separately (see Prerequisites).
