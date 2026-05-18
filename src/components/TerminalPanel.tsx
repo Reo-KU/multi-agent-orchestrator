@@ -59,9 +59,9 @@ export default function TerminalPanel(): ReactElement {
       fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
       fontSize: 12,
       theme: {
-        background: "#020617",
-        foreground: "#e2e8f0",
-        cursor: "#22d3ee"
+        background: "#08060f",
+        foreground: "#f5f1ea",
+        cursor: "#ff7a3d"
       }
     });
     const fitAddon = new FitAddon();
@@ -113,11 +113,11 @@ export default function TerminalPanel(): ReactElement {
   };
 
   return (
-    <section className="h-56 border-t border-slate-800 bg-slate-950">
+    <section className="h-full bg-brand-surface/95">
       <div className="flex h-full min-h-0 flex-col">
-        <div className="flex items-center gap-1 overflow-x-auto border-b border-slate-800 px-3 py-2">
+        <div className="flex items-center gap-1 overflow-x-auto border-b border-brand-line px-3 py-2">
           {agents.length === 0 ? (
-            <span className="text-xs text-slate-500">{t.terminal.noSessions}</span>
+            <span className="text-xs text-brand-textDim">{t.terminal.noSessions}</span>
           ) : null}
           {agents.map((agent) => (
             <button
@@ -126,13 +126,13 @@ export default function TerminalPanel(): ReactElement {
               onClick={() => handleTabClick(agent.id)}
               className={`rounded px-3 py-1.5 text-xs ${
                 activeAgent?.id === agent.id
-                  ? "bg-cyan-500 text-slate-950"
-                  : "border border-slate-800 text-slate-300 hover:bg-slate-900"
+                  ? "bg-brand-sunsetA text-brand-bg"
+                  : "border border-brand-line text-brand-textDim hover:bg-brand-surfaceHi hover:text-brand-text"
               }`}
             >
               {agent.name}
               {agent.status === "running" ? (
-                <span className="ml-1.5 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-green-400 align-middle" />
+                <span className="ml-1.5 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-brand-aurora align-middle" />
               ) : null}
             </button>
           ))}
@@ -142,7 +142,7 @@ export default function TerminalPanel(): ReactElement {
                 type="button"
                 onClick={() => void window.mao.pty.write(activeAgent.id, "\x03")}
                 title={t.terminal.ctrlCTooltip}
-                className="rounded border border-slate-800 px-2 py-1 text-[11px] text-slate-300 hover:bg-slate-900"
+                className="rounded border border-brand-line px-2 py-1 text-[11px] text-brand-textDim hover:bg-brand-surfaceHi hover:text-brand-text"
               >
                 {t.terminal.ctrlC}
               </button>
@@ -151,7 +151,7 @@ export default function TerminalPanel(): ReactElement {
                 onClick={() => void window.mao.pty.kill(activeAgent.id)}
                 disabled={activeAgent.status !== "running" && activeAgent.status !== "starting"}
                 title={t.terminal.stopTooltip}
-                className="rounded bg-red-500 px-2.5 py-1 text-[11px] font-medium text-red-950 hover:bg-red-400 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:text-slate-500"
+                className="rounded bg-brand-ember px-2.5 py-1 text-[11px] font-medium text-brand-bg hover:opacity-90 disabled:cursor-not-allowed disabled:bg-brand-surfaceHi disabled:text-brand-textDim"
               >
                 {t.terminal.stop}
               </button>
@@ -163,15 +163,15 @@ export default function TerminalPanel(): ReactElement {
             activeIsInteractive && ttydUrl ? (
               <iframe
                 src={`${ttydUrl}?arg=&fontSize=12`}
-                className="h-full w-full rounded border border-slate-800 bg-slate-950"
+                className="h-full w-full rounded border border-brand-line bg-brand-bg"
                 title={`${activeAgent.name}${t.terminal.agentTitleSuffix}`}
                 allow="clipboard-read; clipboard-write"
               />
             ) : (
-              <div ref={containerRef} className="h-full rounded border border-slate-800 bg-slate-950 p-2" />
+              <div ref={containerRef} className="h-full rounded border border-brand-line bg-brand-bg p-2" />
             )
           ) : (
-            <div className="flex h-full items-center justify-center rounded border border-slate-800 text-sm text-slate-500">
+            <div className="flex h-full items-center justify-center rounded border border-brand-line text-sm text-brand-textDim">
               {t.terminal.placeholder}
             </div>
           )}

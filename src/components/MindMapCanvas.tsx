@@ -1,10 +1,10 @@
-import { memo, useMemo, type ReactElement } from "react";
+import { memo, useEffect, useMemo, useState, type ReactElement } from "react";
 import ReactFlow, {
-  Background,
-  Controls,
   Handle,
   MarkerType,
   Position,
+  useReactFlow,
+  useStore,
   type Connection,
   type Edge,
   type Node,
@@ -25,11 +25,11 @@ export default function MindMapCanvas(): ReactElement {
   const graphEdges = useAppStore((state) => state.edges);
   const selectedNodeId = useAppStore((state) => state.selectedNodeId);
   const selectNode = useAppStore((state) => state.selectNode);
+  const setSelectedAgentId = useAppStore((state) => state.setSelectedAgentId);
   const updateNodePosition = useAppStore((state) => state.updateNodePosition);
   const connectNodes = useAppStore((state) => state.connectNodes);
   const removeEdge = useAppStore((state) => state.removeEdge);
   const setRoot = useAppStore((state) => state.setRoot);
-  const removeNode = useAppStore((state) => state.removeNode);
   const locale = useAppStore((state) => state.locale);
 
   const agentById = useMemo(() => new Map(agents.map((agent) => [agent.id, agent])), [agents]);
@@ -55,15 +55,13 @@ export default function MindMapCanvas(): ReactElement {
           data: {
             agent,
             isRoot: node.isRoot,
-            onSetRoot: () => void setRoot(node.id),
-            onDelete: () => void removeNode(node.id),
             locale
           }
         };
       });
       return [userNode, ...agentNodes];
     },
-    [agentById, graphNodes, locale, removeNode, selectedNodeId, setRoot]
+    [agentById, graphNodes, locale, selectedNodeId]
   );
 
   const edges: Edge[] = useMemo(() => {
@@ -76,7 +74,8 @@ export default function MindMapCanvas(): ReactElement {
             target: rootNode.id,
             type: "smoothstep",
             markerEnd: { type: MarkerType.ArrowClosed },
-            style: { stroke: "#22d3ee", strokeWidth: 2.5, strokeDasharray: "4 2" }
+            deletable: false,
+            style: { stroke: "url(#userRootGrad)", strokeWidth: 1.5, strokeDasharray: "4 4" }
           }
         ]
       : [];
@@ -109,35 +108,107 @@ export default function MindMapCanvas(): ReactElement {
   };
 
   return (
-    <section className="flex min-h-0 min-w-0 flex-1 bg-slate-900">
+    <section className="fixed inset-0 bg-transparent">
       <ReactFlow
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
         fitView
+        panOnDrag
+        proOptions={{ hideAttribution: true }}
         deleteKeyCode={["Backspace", "Delete"]}
         onNodeClick={(_, node) => {
-          if (node.id !== USER_NODE_ID) selectNode(node.id);
+          if (node.id !== USER_NODE_ID) {
+            selectNode(node.id);
+            const graphNode = graphNodes.find((item) => item.id === node.id);
+            setSelectedAgentId(graphNode?.agentId ?? null);
+          }
         }}
-        onPaneClick={() => selectNode(null)}
+        onPaneClick={() => {
+          selectNode(null);
+          setSelectedAgentId(null);
+        }}
         onNodeDragStop={(_, node) => {
           if (node.id !== USER_NODE_ID) updateNodePosition(node.id, node.position);
         }}
         onConnect={onConnect}
         onEdgesDelete={handleEdgesDelete}
       >
-        <Background color="#334155" gap={24} />
-        <Controls className="!border-slate-700 !bg-slate-900 !shadow-none [&_button]:!border-slate-700 [&_button]:!bg-slate-900 [&_button]:!fill-slate-100" />
+        <EdgeToolbar />
+        <svg width="0" height="0">
+          <defs>
+            <linearGradient id="userRootGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#5856d6" />
+              <stop offset="100%" stopColor="#ff7a3d" />
+            </linearGradient>
+          </defs>
+        </svg>
       </ReactFlow>
     </section>
+  );
+}
+
+function EdgeToolbar(): ReactElement | null {
+  const reactFlow = useReactFlow();
+  const removeEdge = useAppStore((state) => state.removeEdge);
+  const selectedEdges = useStore((state) =>
+    state.edges.filter((edge) => edge.selected && edge.id !== USER_EDGE_ID)
+  );
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const selectedEdge = selectedEdges.length === 1 ? selectedEdges[0] : null;
+
+  useEffect(() => {
+    if (!selectedEdge) {
+      setPos(null);
+      return;
+    }
+
+    const sourceNode = reactFlow.getNode(selectedEdge.source);
+    const targetNode = reactFlow.getNode(selectedEdge.target);
+    if (!sourceNode || !targetNode) {
+      setPos(null);
+      return;
+    }
+
+    const sourceX = sourceNode.position.x + (sourceNode.width ?? 200) / 2;
+    const sourceY = sourceNode.position.y + (sourceNode.height ?? 60) / 2;
+    const targetX = targetNode.position.x + (targetNode.width ?? 200) / 2;
+    const targetY = targetNode.position.y + (targetNode.height ?? 60) / 2;
+    const mid = reactFlow.flowToScreenPosition({
+      x: (sourceX + targetX) / 2,
+      y: (sourceY + targetY) / 2
+    });
+    setPos(mid);
+  }, [reactFlow, selectedEdge]);
+
+  if (!pos || !selectedEdge) {
+    return null;
+  }
+
+  const onDelete = (): void => {
+    void removeEdge(selectedEdge.id);
+    reactFlow.setEdges((edges) => edges.filter((edge) => edge.id !== selectedEdge.id));
+  };
+
+  return (
+    <div
+      style={{ top: pos.y, left: pos.x }}
+      className="pointer-events-auto fixed z-40 -translate-x-1/2 -translate-y-1/2 rounded-full border border-brand-line bg-brand-surface/95 px-3 py-1.5 text-xs shadow-2xl backdrop-blur"
+    >
+      <button
+        type="button"
+        onClick={onDelete}
+        className="font-medium text-brand-ember hover:underline"
+      >
+        Disconnect
+      </button>
+    </div>
   );
 }
 
 type AgentNodeData = {
   agent?: Agent;
   isRoot: boolean;
-  onSetRoot: () => void;
-  onDelete: () => void;
   locale: AgentLocale;
 };
 
@@ -146,75 +217,40 @@ type UserNodeData = {
 };
 
 const nodeTypes = {
-  agent: memo(function AgentNode({ data }: NodeProps<AgentNodeData>): ReactElement {
-    const status = data.agent?.status ?? "stopped";
+  agent: memo(function AgentNode({ data, selected }: NodeProps<AgentNodeData>): ReactElement {
+    const status = data.agent?.status ?? "idle";
     const t = getTranslations(data.locale);
-    const dotColor = {
-      stopped: "bg-slate-500",
-      starting: "bg-yellow-400",
-      running: "bg-green-400",
-      error: "bg-red-500"
-    }[status];
     const statusClass = {
-      stopped: "border-slate-700",
-      starting: "border-yellow-400 mao-node-starting",
-      running: "border-cyan-400 mao-node-running",
-      error: "border-red-500 mao-node-error"
+      idle: "border-brand-violet/30 shadow-[0_0_18px_rgba(88,86,214,0.30)]",
+      stopped: "opacity-50",
+      starting: "mao-ring-starting animate-pulse border-brand-sunsetA/60 shadow-[0_0_20px_rgba(255,122,61,0.35)]",
+      running: "mao-ring-running border-brand-aurora/60 shadow-[0_0_22px_rgba(52,199,89,0.45)]",
+      error: "animate-pulse border-brand-ember/70 shadow-[0_0_22px_rgba(255,59,48,0.45)]"
     }[status];
+    const role = data.agent?.role || data.agent?.mode || data.agent?.type || "";
 
     return (
-      <div className={`min-w-48 rounded border bg-slate-950 px-3 py-2 text-slate-100 shadow-lg ${statusClass}`}>
-        <Handle type="target" position={Position.Top} className="!bg-cyan-400" />
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className={`h-2.5 w-2.5 rounded-full ${dotColor}`} />
-              <span className="truncate text-sm font-medium">{data.agent?.name ?? t.mindMap.missingAgent}</span>
-            </div>
-            <div className="mt-1 truncate text-xs text-slate-400">{data.agent?.role || data.agent?.command}</div>
+      <div
+        className={`relative min-w-[180px] cursor-pointer rounded-2xl border border-brand-line bg-brand-surface/80 px-4 py-3 text-brand-text shadow-2xl backdrop-blur transition-all ${statusClass} ${
+          selected ? "ring-2 ring-brand-sunsetA/60 ring-offset-2 ring-offset-brand-bg" : ""
+        }`}
+      >
+        <Handle type="target" position={Position.Top} className="!h-2 !w-8 !rounded-full !border-0 !bg-brand-violet/50" />
+        <div className="min-w-0">
+          <div className="truncate text-sm font-semibold text-brand-text">{data.agent?.name ?? t.mindMap.missingAgent}</div>
+          <div className="mt-1 truncate text-[10px] uppercase tracking-[0.18em] text-brand-textDim">
+            {role || (data.isRoot ? t.mindMap.root : data.agent?.status ?? "")}
           </div>
-          {data.isRoot ? (
-            <span className="rounded bg-cyan-500 px-1.5 py-0.5 text-[10px] font-semibold text-slate-950">
-              {t.mindMap.root}
-            </span>
-          ) : null}
         </div>
-        <div className="mt-3 flex gap-2">
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              data.onSetRoot();
-            }}
-            className="rounded border border-slate-700 px-2 py-1 text-[11px] hover:bg-slate-800"
-          >
-            {t.mindMap.setAsRoot}
-          </button>
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              data.onDelete();
-            }}
-            className="rounded border border-red-900/70 px-2 py-1 text-[11px] text-red-300 hover:bg-red-950/40"
-          >
-            {t.mindMap.deleteNode}
-          </button>
-        </div>
-        <Handle type="source" position={Position.Bottom} className="!bg-cyan-400" />
+        <Handle type="source" position={Position.Bottom} className="!h-2 !w-8 !rounded-full !border-0 !bg-brand-violet/50" />
       </div>
     );
   }),
-  user: memo(function UserNode({ data }: NodeProps<UserNodeData>): ReactElement {
-    const t = getTranslations(data.locale);
+  user: memo(function UserNode(_: NodeProps<UserNodeData>): ReactElement {
     return (
-      <div
-        className="flex w-32 flex-col items-center gap-1 rounded-full border-2 border-cyan-500 bg-cyan-950/70 px-4 py-3 text-cyan-100 shadow-lg"
-        title={t.mindMap.userHint}
-      >
-        <span className="text-2xl">👤</span>
-        <span className="text-xs font-medium">{t.mindMap.user}</span>
-        <Handle type="source" position={Position.Bottom} className="!bg-cyan-400" />
+      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-brand-violet/40 to-brand-sunsetA/40 text-2xl shadow-[0_0_24px_rgba(255,122,61,0.35)]">
+        👤
+        <Handle type="source" position={Position.Bottom} className="!h-2 !w-8 !rounded-full !border-0 !bg-brand-sunsetA/60" />
       </div>
     );
   })

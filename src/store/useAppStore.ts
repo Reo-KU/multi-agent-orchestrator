@@ -251,6 +251,7 @@ type AppState = {
   edges: GraphEdge[];
   tasks: Task[];
   selectedNodeId: string | null;
+  selectedAgentId: string | null;
   rootNodeId: string | null;
   logs: Record<string, string[]>;
   pendingDispatches: PendingDispatch[];
@@ -270,6 +271,7 @@ type AppState = {
   removeEdge: (edgeId: string) => Promise<void>;
   setRoot: (nodeId: string) => Promise<void>;
   selectNode: (nodeId: string | null) => void;
+  setSelectedAgentId: (agentId: string | null) => void;
   appendLog: (agentId: string, data: string) => void;
   ensureAgentReady: (agentId: string) => Promise<void>;
   startAgent: (agentId: string) => Promise<void>;
@@ -277,6 +279,8 @@ type AppState = {
   runTask: (input: { title: string; body: string; mode: TaskMode }) => Promise<void>;
   dispatchToAgent: (agentId: string, body: string, pendingId?: string) => Promise<void>;
   cancelCurrentTask: () => Promise<void>;
+  terminalDrawerOpen: boolean;
+  setTerminalDrawerOpen: (open: boolean) => void;
 };
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -285,11 +289,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   edges: [],
   tasks: [],
   selectedNodeId: null,
+  selectedAgentId: null,
   rootNodeId: null,
   logs: {},
   pendingDispatches: [],
-  dispatchMode: "manual",
+  dispatchMode: "auto",
   runningTaskId: null,
+  terminalDrawerOpen: false,
+  setTerminalDrawerOpen: (open) => set({ terminalDrawerOpen: open }),
   introducedAgents: new Set<string>(),
   locale: detectInitialLocale(),
 
@@ -363,7 +370,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         agents,
         nodes,
         rootNodeId: state.rootNodeId ?? node?.id ?? null,
-        selectedNodeId: state.selectedNodeId ?? node?.id ?? null
+        selectedNodeId: state.selectedNodeId ?? node?.id ?? null,
+        selectedAgentId: state.selectedAgentId ?? savedAgent.id
       };
     });
     saveGraphDebounced({ nodes: get().nodes, edges: get().edges });
@@ -393,6 +401,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         edges,
         rootNodeId: rootNode?.id ?? null,
         selectedNodeId: state.selectedNodeId && removedNodeIds.has(state.selectedNodeId) ? rootNode?.id ?? null : state.selectedNodeId,
+        selectedAgentId: state.selectedAgentId === agentId ? null : state.selectedAgentId,
         logs: Object.fromEntries(Object.entries(state.logs).filter(([id]) => id !== agentId))
       };
     });
@@ -405,7 +414,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       return {
         nodes: [...state.nodes, node],
         rootNodeId: state.rootNodeId ?? node.id,
-        selectedNodeId: node.id
+        selectedNodeId: node.id,
+        selectedAgentId: agentId
       };
     });
     saveGraphDebounced({ nodes: get().nodes, edges: get().edges });
@@ -427,7 +437,13 @@ export const useAppStore = create<AppState>((set, get) => ({
         nodes: rootNode ? nodes.map((node) => ({ ...node, isRoot: node.id === rootNode.id })) : nodes,
         edges,
         rootNodeId: rootNode?.id ?? null,
-        selectedNodeId: state.selectedNodeId === nodeId ? rootNode?.id ?? null : state.selectedNodeId
+        selectedNodeId: state.selectedNodeId === nodeId ? rootNode?.id ?? null : state.selectedNodeId,
+        selectedAgentId:
+          state.selectedNodeId === nodeId
+            ? rootNode
+              ? state.nodes.find((node) => node.id === rootNode.id)?.agentId ?? null
+              : null
+            : state.selectedAgentId
       };
     });
     saveGraphDebounced({ nodes: get().nodes, edges: get().edges });
@@ -461,12 +477,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => ({
       nodes: state.nodes.map((node) => ({ ...node, isRoot: node.id === nodeId })),
       rootNodeId: nodeId,
-      selectedNodeId: nodeId
+      selectedNodeId: nodeId,
+      selectedAgentId: state.nodes.find((node) => node.id === nodeId)?.agentId ?? state.selectedAgentId
     }));
     saveGraphDebounced({ nodes: get().nodes, edges: get().edges });
   },
 
   selectNode: (nodeId) => set({ selectedNodeId: nodeId }),
+
+  setSelectedAgentId: (agentId) => set({ selectedAgentId: agentId }),
 
   appendLog: (agentId, data) => {
     mao().log.append(agentId, data).catch(() => undefined);
@@ -478,60 +497,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     }));
 
-    const state = get();
-    const sourceAgent = state.agents.find((agent) => agent.id === agentId);
-    if ((sourceAgent?.mode ?? "exec") === "exec") {
-      return;
-    }
-
-    const blocks = parseToBlocks((state.logs[agentId] ?? []).join(""), state.agents);
-    const newBlocks = blocks.filter((block) => {
-      if (!block.agentId) {
-        return false;
-      }
-      const key = getDispatchKey(block);
-      if (seenDispatchKeys.has(key)) {
-        return false;
-      }
-      seenDispatchKeys.add(key);
-      return true;
-    });
-
-    if (newBlocks.length === 0) {
-      return;
-    }
-
-    if (state.dispatchMode === "auto") {
-      void Promise.all(
-        newBlocks
-          .filter((block): block is ToBlock & { agentId: string } => Boolean(block.agentId))
-          .map((block) => get().dispatchToAgent(block.agentId, block.body))
-      );
-      return;
-    }
-
-    if (newBlocks.length > 0) {
-      const latestByAgent = new Map<string, ToBlock & { agentId: string }>();
-      for (const block of newBlocks) {
-        if (block.agentId) {
-          latestByAgent.set(block.agentId, { ...block, agentId: block.agentId });
-        }
-      }
-      const latestBlocks = [...latestByAgent.values()];
-
-      set((current) => ({
-        pendingDispatches: [
-          ...current.pendingDispatches.filter(
-            (pending) => !latestByAgent.has(pending.agentId ?? "")
-          ),
-          ...latestBlocks.map((block) => ({
-            ...block,
-            id: createId("dispatch"),
-            taskId: current.tasks[0]?.id
-          }))
-        ]
-      }));
-    }
+    // Live streaming dispatch was disabled. Dispatch now happens once at end-of-task
+    // in executeForAgent (after runInteractive's signal is received). Streaming caused
+    // duplicate dispatches because the regex body capture grew with each chunk, and
+    // because the spec file's historical [TO: workerN] markers get echoed in the TUI
+    // buffer.
   },
 
   ensureAgentReady: async (agentId) => {
@@ -617,6 +587,15 @@ export const useAppStore = create<AppState>((set, get) => ({
       throw new Error("Root agent is not selected.");
     }
 
+    if (rootAgent.status === "error") {
+      set((current) => ({
+        agents: current.agents.map((agent) =>
+          agent.id === rootAgent.id ? { ...agent, status: "stopped" } : agent
+        )
+      }));
+      console.info("[MAO dispatch reset]", { agentId: rootAgent.id, from: "error", to: "stopped" });
+    }
+
     const existingBlocks = parseToBlocks((state.logs[rootAgent.id] ?? []).join(""), state.agents);
     seenDispatchKeys.clear();
     for (const block of existingBlocks) {
@@ -659,6 +638,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   dispatchToAgent: async (agentId, body, pendingId) => {
+    console.info("[MAO dispatchToAgent]", { agentId, bodyHead: body.slice(0, 50) });
     const state = get();
     const pending = pendingId
       ? state.pendingDispatches.find((item) => item.id === pendingId)
@@ -810,6 +790,13 @@ async function executeForAgent(
 
   const latestAgents = getState().agents;
   const blocks = parseToBlocks(result.lastMessage, latestAgents);
+  console.info("[MAO dispatch]", {
+    rootAgent: taskState.rootAgentId,
+    agentId,
+    taskId: taskState.taskId,
+    dispatchMode,
+    blocks: blocks.map((block) => ({ to: block.agentId, bodyHead: block.body.slice(0, 50) }))
+  });
   const emitted = blocks
     .filter((block): block is ToBlock & { agentId: string } => Boolean(block.agentId))
     .map((block) => ({ to: block.agentId, body: block.body }));
@@ -850,6 +837,7 @@ async function executeForAgent(
         if (cancelledTaskIds.has(taskState.taskId)) {
           return Promise.resolve();
         }
+        console.info("[MAO auto-dispatch]", { to: block.agentId, bodyHead: block.body.slice(0, 50) });
         return executeForAgent(block.agentId, block.body, taskState, dispatchMode, setState, getState);
       })
     );

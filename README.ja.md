@@ -92,7 +92,7 @@ electron-builder で配布パッケージを生成。macOS は `.dmg`、Windows 
 
 ## ワークスペースの保存先
 
-エージェント設定・グラフ・タスク・履歴・signal log は次の場所に保存されます:
+エージェント設定・グラフ・タスク・履歴は次の場所に保存されます:
 
 ```text
 ~/.multi-agent-orchestrator/workspaces/default/
@@ -100,11 +100,27 @@ electron-builder で配布パッケージを生成。macOS は `.dmg`、Windows 
 ├── graph.json             # マインドマップ (位置・接続)
 ├── tasks.json             # タスク履歴
 ├── agent_history.json     # agent ごとの応答履歴
-├── project_summary.md     # プロジェクト概要 (各 prompt 先頭に注入)
-└── .task-signals.log      # interactive モードの完了 signal
+└── project_summary.md     # プロジェクト概要 (各 prompt 先頭に注入)
 ```
 
 JSON は手動編集も可能 (zod で検証され、不正なら空配列で初期化される)。
+
+## ワークスペース内に作られるファイル
+
+MAO は agent の `workingDirectory` 内に `.mao/` ディレクトリを作成し、以下を
+管理します:
+
+- `.mao/<taskId>.md` — タスク仕様 (graph 情報 / プロジェクト情報 / 受信指示 / 応答ルール)
+- `.mao/signals.log` — タスク完了 signal (agent が echo で追記)
+
+agent には PTY 経由で短い自然文だけが送られ、複雑な文脈は仕様ファイル経由で
+読まれます。これは claude TUI の prompt injection 検知や、CLI の sandbox
+permission ブロックを避けるためです。
+
+`.mao/` は MAO が起動時に各 workspace の `.gitignore` に自動追記します
+(workspace が git 管理下の場合のみ)。タスク仕様ファイルは成功・中断・タイム
+アウト・エラーのいずれでも削除され、`signals.log` は大きくなったら rotate
+されます。
 
 ## UI ガイド
 

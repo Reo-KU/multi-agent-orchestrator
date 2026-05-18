@@ -106,6 +106,24 @@ Workspace JSON paths are defined in `src/utils/storage.ts` and point to:
 ~/.multi-agent-orchestrator/workspaces/default/
 ```
 
+## Files Created Inside Agent Workspaces
+
+MAO creates a `.mao/` directory inside each agent's `workingDirectory` while a
+task is running:
+
+- `.mao/<taskId>.md` — task spec with graph context, project information,
+  received instruction, and response rules
+- `.mao/signals.log` — task completion signals appended by agents with `echo`
+
+Only a short natural-language instruction is sent through the PTY. The larger
+task context is read from the task spec file. This avoids prompt-injection
+detection in Claude TUI and CLI sandbox permission blocks caused by sending a
+large prompt directly through the terminal.
+
+If the workspace is a git repository, MAO automatically appends `.mao/` to that
+workspace's `.gitignore`. The task spec file is removed after success, abort,
+timeout, or error; `signals.log` is rotated when it grows large.
+
 ## UI Walkthrough
 
 - Project Summary: 左上の "Project Summary" ボタンから、プロジェクト全体の前提や方針を Markdown テキストとして編集できます。

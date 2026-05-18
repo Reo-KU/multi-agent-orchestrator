@@ -54,35 +54,35 @@ export default function ProjectSummaryModal({ onClose }: ProjectSummaryModalProp
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4">
-      <div className="w-full max-w-3xl rounded border border-slate-700 bg-slate-900 shadow-xl">
-        <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-bg/70 px-4 backdrop-blur-sm">
+      <div className="w-full max-w-3xl rounded border border-brand-line bg-brand-surface text-brand-text shadow-xl">
+        <div className="flex items-center justify-between border-b border-brand-line px-5 py-4">
           <h2 className="text-sm font-semibold">{t.projectSummary.title}</h2>
           <button
             type="button"
             onClick={onClose}
-            className="rounded px-2 py-1 text-sm text-slate-300 hover:bg-slate-800"
+            className="rounded px-2 py-1 text-sm text-brand-textDim hover:bg-brand-surfaceHi hover:text-brand-text"
           >
             {t.projectSummary.close}
           </button>
         </div>
 
         <div className="grid gap-3 p-5">
-          {loading ? <p className="text-sm text-slate-400">{t.projectSummary.loading}</p> : null}
+          {loading ? <p className="text-sm text-brand-textDim">{t.projectSummary.loading}</p> : null}
           <textarea
             value={text}
             onChange={(event) => setText(event.target.value)}
-            className="min-h-[400px] rounded border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm outline-none focus:border-cyan-500"
+            className="min-h-[400px] rounded border border-brand-line bg-brand-bg px-3 py-2 font-mono text-sm text-brand-text outline-none focus:border-brand-sunsetA"
             placeholder={t.projectSummary.placeholder}
           />
-          {error ? <p className="text-sm text-red-300">{error}</p> : null}
+          {error ? <p className="text-sm text-brand-ember">{error}</p> : null}
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-slate-800 px-5 py-4">
+        <div className="flex justify-end gap-2 border-t border-brand-line px-5 py-4">
           <button
             type="button"
             onClick={onClose}
-            className="rounded border border-slate-700 px-3 py-2 text-sm hover:bg-slate-800"
+            className="rounded border border-brand-line px-3 py-2 text-sm text-brand-textDim hover:bg-brand-surfaceHi hover:text-brand-text"
           >
             {t.projectSummary.cancel}
           </button>
@@ -90,7 +90,7 @@ export default function ProjectSummaryModal({ onClose }: ProjectSummaryModalProp
             type="button"
             onClick={() => void save()}
             disabled={saving}
-            className="rounded bg-cyan-500 px-3 py-2 text-sm font-medium text-slate-950 hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded bg-gradient-to-br from-brand-sunsetA to-brand-sunsetB px-3 py-2 text-sm font-medium text-white hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {saving ? t.projectSummary.saving : t.projectSummary.save}
           </button>

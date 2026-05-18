@@ -2,59 +2,65 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  margin: 0;
-}
-
-@keyframes mao-pulse-running {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.45);
-  }
-  50% {
-    box-shadow: 0 0 0 7px rgba(34, 211, 238, 0);
+@layer base {
+  body {
+    margin: 0;
+    @apply bg-brand-bg text-brand-text antialiased;
+    font-feature-settings: "ss01", "cv11";
   }
 }
 
-@keyframes mao-pulse-starting {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.45);
-  }
-  50% {
-    box-shadow: 0 0 0 6px rgba(234, 179, 8, 0);
+@keyframes mao-ring-rotate {
+  to {
+    transform: rotate(360deg);
   }
 }
 
-.mao-node-running {
-  animation: mao-pulse-running 1.4s ease-in-out infinite;
+.mao-ring-running::before,
+.mao-ring-starting::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  padding: 2px;
+  pointer-events: none;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
 }
 
-.mao-node-starting {
-  animation: mao-pulse-starting 1.4s ease-in-out infinite;
+.mao-ring-running::before {
+  background: conic-gradient(from 0deg, transparent, theme("colors.brand.aurora"), transparent);
+  animation: mao-ring-rotate 4s linear infinite;
 }
 
-.mao-node-error {
-  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.9);
+.mao-ring-starting::before {
+  background: conic-gradient(from 0deg, transparent, theme("colors.brand.sunsetA"), theme("colors.brand.sunsetB"), transparent);
 }
 
 /* edges */
 .react-flow__edge .react-flow__edge-path {
-  stroke: #64748b;
-  stroke-width: 1.5;
-  transition: stroke 0.12s ease, stroke-width 0.12s ease;
+  stroke: #d2d2d7;
+  stroke-width: 2;
+  transition: stroke 0.15s ease, stroke-width 0.15s ease, filter 0.15s ease;
+  cursor: pointer;
 }
 .react-flow__edge:hover .react-flow__edge-path {
-  stroke: #94a3b8;
-  stroke-width: 2.5;
+  stroke: #5856d6;
+  stroke-width: 3.5;
+  filter: drop-shadow(0 0 6px rgba(88, 86, 214, 0.5));
 }
 .react-flow__edge.selected .react-flow__edge-path,
 .react-flow__edge:focus .react-flow__edge-path,
 .react-flow__edge:focus-visible .react-flow__edge-path {
-  stroke: #22d3ee;
-  stroke-width: 3;
+  stroke: #ff7a3d;
+  stroke-width: 4.5;
+  filter: drop-shadow(0 0 10px rgba(255, 122, 61, 0.7));
 }
 .react-flow__edge.selected .react-flow__arrowhead,
 .react-flow__edge:focus .react-flow__arrowhead {
-  fill: #22d3ee;
+  fill: #ff7a3d;
+}
+.react-flow__edge .react-flow__edge-interaction {
+  cursor: pointer;
 }

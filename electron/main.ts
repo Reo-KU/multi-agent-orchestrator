@@ -20,7 +20,6 @@ import {
   AGENTS_JSON_PATH,
   GRAPH_JSON_PATH,
   PROJECT_SUMMARY_PATH,
-  TASK_SIGNALS_PATH,
   TASKS_JSON_PATH,
   WORKSPACE_ROOT
 } from "../src/utils/storage";
@@ -37,7 +36,7 @@ const agentSchema = z.object({
   id: z.string(),
   name: z.string(),
   type: z.enum(["claude", "codex", "grok", "gemini", "custom"]),
-  mode: z.enum(["exec", "interactive"]).optional().default("exec"),
+  mode: z.enum(["exec", "interactive"]).optional().default("interactive"),
   permissionPolicy: z.enum(["ask", "safe-auto", "yolo"]).optional().default("safe-auto"),
   command: z.string(),
   args: z.array(z.string()).optional(),
@@ -142,10 +141,6 @@ const initializeStorage = async (): Promise<void> => {
   await ensureJsonFile(GRAPH_JSON_PATH, { nodes: [], edges: [] });
   await ensureJsonFile(TASKS_JSON_PATH, []);
   await ensureJsonFile(AGENT_HISTORY_PATH, {});
-
-  if (!(await fs.pathExists(TASK_SIGNALS_PATH))) {
-    await fs.writeFile(TASK_SIGNALS_PATH, "", "utf8");
-  }
 
   if (!(await fs.pathExists(PROJECT_SUMMARY_PATH))) {
     await fs.writeFile(
