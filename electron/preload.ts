@@ -11,6 +11,7 @@ import type {
   PermissionRequestEvent,
   PtyDataEvent,
   PtyStatusEvent,
+  SetupCheckResult,
   Task
 } from "../src/types";
 
@@ -52,6 +53,9 @@ contextBridge.exposeInMainWorld("mao", {
   },
   tmux: {
     selectWindow: (agentId: string): Promise<boolean> => ipcRenderer.invoke("mao:tmux:selectWindow", agentId)
+  },
+  setup: {
+    check: (): Promise<SetupCheckResult> => ipcRenderer.invoke("mao:setup:check")
   },
   permission: {
     respond: (requestId: string, decision: PermissionDecision): Promise<boolean> =>

@@ -27,6 +27,7 @@ import { maskSecrets } from "../src/utils/maskSecrets";
 import { AgentRunner } from "./agentRunner";
 import { MCPPermissionServer } from "./mcpPermissionServer";
 import { createShellTestAgent, PtyManager } from "./ptyManager";
+import { runSetupCheck } from "./systemCheck";
 import { TmuxManager } from "./tmuxManager";
 import { TtydManager } from "./ttydManager";
 
@@ -395,6 +396,10 @@ const registerIpcHandlers = (): void => {
       return tmuxManager.selectWindow(agentId);
     }
   );
+
+  ipcMain.handle("mao:setup:check" satisfies keyof IpcChannels, async (): ReturnType<IpcChannels["mao:setup:check"]> => {
+    return runSetupCheck();
+  });
 };
 
 const registerPtyBroadcasts = (): void => {

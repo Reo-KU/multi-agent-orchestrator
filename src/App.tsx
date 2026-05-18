@@ -4,10 +4,12 @@ import Inspector from "./components/Inspector";
 import MindMapCanvas from "./components/MindMapCanvas";
 import PermissionDialog from "./components/PermissionDialog";
 import ProjectSummaryModal from "./components/ProjectSummaryModal";
+import SetupCheckModal from "./components/SetupCheckModal";
 import TaskInput from "./components/TaskInput";
 import TerminalPanel from "./components/TerminalPanel";
 import { getTranslations } from "./i18n";
 import { useAppStore } from "./store/useAppStore";
+import type { SetupCheckResult } from "./types";
 
 export default function App(): ReactElement {
   const loadAll = useAppStore((state) => state.loadAll);
@@ -15,6 +17,9 @@ export default function App(): ReactElement {
   const setLocale = useAppStore((state) => state.setLocale);
   const t = getTranslations(locale);
   const [projectModalOpen, setProjectModalOpen] = useState(false);
+  const [setupResult, setSetupResult] = useState<SetupCheckResult | null>(null);
+  const [setupDismissed, setSetupDismissed] = useState(false);
+  const [rechecking, setRechecking] = useState(false);
   const [leftWidth, setLeftWidth] = useState<number>(() => {
     const stored = Number.parseInt(localStorage.getItem("mao.leftWidth") ?? "", 10);
     return Number.isFinite(stored) && stored > 0 ? stored : 280;
@@ -29,6 +34,13 @@ export default function App(): ReactElement {
       console.error("Failed to load app state", error);
     });
   }, [loadAll]);
+
+  useEffect(() => {
+    if (!window.mao.setup?.check) return;
+    void window.mao.setup.check().then(setSetupResult).catch((error) => {
+      console.error("Failed to run setup check", error);
+    });
+  }, []);
 
   useEffect(() => {
     localStorage.setItem("mao.leftWidth", String(leftWidth));
@@ -64,6 +76,21 @@ export default function App(): ReactElement {
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
   };
+
+  const recheckSetup = async (): Promise<void> => {
+    if (!window.mao.setup?.check) return;
+    setRechecking(true);
+    try {
+      setSetupResult(await window.mao.setup.check());
+    } finally {
+      setRechecking(false);
+    }
+  };
+
+  const showSetupModal =
+    setupResult !== null &&
+    !setupDismissed &&
+    setupResult.tools.some((tool) => tool.category === "required" && !tool.available);
 
   return (
     <main className="flex h-screen flex-col bg-slate-950 text-slate-100">
@@ -127,6 +154,14 @@ export default function App(): ReactElement {
       <TerminalPanel />
       {projectModalOpen ? (
         <ProjectSummaryModal onClose={() => setProjectModalOpen(false)} />
+      ) : null}
+      {showSetupModal && setupResult ? (
+        <SetupCheckModal
+          result={setupResult}
+          onDismiss={() => setSetupDismissed(true)}
+          onRecheck={() => void recheckSetup()}
+          rechecking={rechecking}
+        />
       ) : null}
       <PermissionDialog />
     </main>

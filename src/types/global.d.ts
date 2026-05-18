@@ -10,6 +10,7 @@ import type {
   PermissionRequestEvent,
   PtyDataEvent,
   PtyStatusEvent,
+  SetupCheckResult,
   Task
 } from "./index";
 
@@ -47,6 +48,9 @@ type MaoApi = {
   };
   tmux: {
     selectWindow: (agentId: string) => Promise<boolean>;
+  };
+  setup: {
+    check: () => Promise<SetupCheckResult>;
   };
   permission: {
     respond: (requestId: string, decision: PermissionDecision) => Promise<boolean>;

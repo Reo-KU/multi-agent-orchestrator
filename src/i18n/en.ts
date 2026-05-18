@@ -132,6 +132,21 @@ export const en = {
     deny: "Deny",
     approve: "Approve",
     morePending: (n: number) => `+ ${n} more pending`
+  },
+  setup: {
+    title: "Setup check",
+    platformMac: "Open Terminal and run the missing install commands.",
+    platformWin: "Open Command Prompt or PowerShell as Administrator if needed, then run the missing install commands.",
+    platformLinux: "Open your terminal and install the missing tools via your package manager.",
+    missingRequired: (n: number) => `${n} required tool(s) are missing. MAO may not start correctly until you install them.`,
+    allRequiredOk: "All required tools are present.",
+    requiredHeader: "Required",
+    optionalHeader: "Optional (install only those you plan to use)",
+    recheck: "Re-check",
+    rechecking: "Re-checking...",
+    continueAnyway: "Continue anyway",
+    close: "Close",
+    copy: "Copy"
   }
 };
 

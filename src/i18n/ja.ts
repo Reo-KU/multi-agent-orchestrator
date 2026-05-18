@@ -134,5 +134,20 @@ export const ja: Translations = {
     deny: "Deny",
     approve: "Approve",
     morePending: (n: number) => `+ ${n} more pending`
+  },
+  setup: {
+    title: "セットアップ確認",
+    platformMac: "ターミナルを開いて、不足しているインストールコマンドを実行してください。",
+    platformWin: "コマンドプロンプト (必要に応じて管理者) または PowerShell を開いて、不足しているインストールコマンドを実行してください。",
+    platformLinux: "ターミナルを開いて、パッケージマネージャから不足分をインストールしてください。",
+    missingRequired: (n: number) => `${n} 個の必須ツールが見つかりません。MAO が正常に動作しない可能性があります。`,
+    allRequiredOk: "必須ツールはすべて揃っています。",
+    requiredHeader: "必須",
+    optionalHeader: "任意 (使う予定のものだけインストール)",
+    recheck: "再チェック",
+    rechecking: "再チェック中...",
+    continueAnyway: "そのまま続ける",
+    close: "閉じる",
+    copy: "コピー"
   }
 };

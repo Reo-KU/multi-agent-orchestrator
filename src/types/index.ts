@@ -121,6 +121,26 @@ export type PermissionDecision = {
   reason?: string;
 };
 
+export type ToolCategory = "required" | "optional";
+
+export type ToolInfo = {
+  name: string;
+  category: ToolCategory;
+  available: boolean;
+  version: string | null;
+  why: string;
+  install: {
+    darwin: string;
+    win32: string;
+    linux: string;
+  };
+};
+
+export type SetupCheckResult = {
+  platform: "darwin" | "win32" | "linux" | string;
+  tools: ToolInfo[];
+};
+
 // IPC 契約 — Pane2(frontend) と Pane3(backend) はこれをimportして使う
 export type IpcChannels = {
   "mao:agent:list": () => Promise<Agent[]>;
@@ -142,6 +162,7 @@ export type IpcChannels = {
   "mao:permission:respond": (requestId: string, decision: PermissionDecision) => Promise<boolean>;
   "mao:tty:getUrl": () => Promise<string | null>;
   "mao:tmux:selectWindow": (agentId: string) => Promise<boolean>;
+  "mao:setup:check": () => Promise<SetupCheckResult>;
 };
 
 export type PtyDataEvent = { agentId: string; data: string };
