@@ -11,6 +11,7 @@ import ReactFlow, {
   type NodeProps
 } from "reactflow";
 import "reactflow/dist/style.css";
+import { getTranslations } from "../i18n";
 import { useAppStore } from "../store/useAppStore";
 import type { Agent } from "../types";
 
@@ -25,6 +26,7 @@ export default function MindMapCanvas(): ReactElement {
   const removeEdge = useAppStore((state) => state.removeEdge);
   const setRoot = useAppStore((state) => state.setRoot);
   const removeNode = useAppStore((state) => state.removeNode);
+  const locale = useAppStore((state) => state.locale);
 
   const agentById = useMemo(() => new Map(agents.map((agent) => [agent.id, agent])), [agents]);
 
@@ -41,11 +43,12 @@ export default function MindMapCanvas(): ReactElement {
             agent,
             isRoot: node.isRoot,
             onSetRoot: () => void setRoot(node.id),
-            onDelete: () => void removeNode(node.id)
+            onDelete: () => void removeNode(node.id),
+            locale
           }
         };
       }),
-    [agentById, graphNodes, removeNode, selectedNodeId, setRoot]
+    [agentById, graphNodes, locale, removeNode, selectedNodeId, setRoot]
   );
 
   const edges: Edge[] = useMemo(
@@ -92,11 +95,13 @@ type AgentNodeData = {
   isRoot: boolean;
   onSetRoot: () => void;
   onDelete: () => void;
+  locale: "en" | "ja";
 };
 
 const nodeTypes = {
   agent: memo(function AgentNode({ data }: NodeProps<AgentNodeData>): ReactElement {
     const status = data.agent?.status ?? "stopped";
+    const t = getTranslations(data.locale);
     const dotColor = {
       stopped: "bg-slate-500",
       starting: "bg-yellow-400",
@@ -117,13 +122,13 @@ const nodeTypes = {
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <span className={`h-2.5 w-2.5 rounded-full ${dotColor}`} />
-              <span className="truncate text-sm font-medium">{data.agent?.name ?? "Missing agent"}</span>
+              <span className="truncate text-sm font-medium">{data.agent?.name ?? t.mindMap.missingAgent}</span>
             </div>
             <div className="mt-1 truncate text-xs text-slate-400">{data.agent?.role || data.agent?.command}</div>
           </div>
           {data.isRoot ? (
             <span className="rounded bg-cyan-500 px-1.5 py-0.5 text-[10px] font-semibold text-slate-950">
-              Root
+              {t.mindMap.root}
             </span>
           ) : null}
         </div>
@@ -136,7 +141,7 @@ const nodeTypes = {
             }}
             className="rounded border border-slate-700 px-2 py-1 text-[11px] hover:bg-slate-800"
           >
-            Set as Root
+            {t.mindMap.setAsRoot}
           </button>
           <button
             type="button"
@@ -146,7 +151,7 @@ const nodeTypes = {
             }}
             className="rounded border border-red-900/70 px-2 py-1 text-[11px] text-red-300 hover:bg-red-950/40"
           >
-            Delete Node
+            {t.mindMap.deleteNode}
           </button>
         </div>
         <Handle type="source" position={Position.Bottom} className="!bg-cyan-400" />

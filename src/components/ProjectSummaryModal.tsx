@@ -1,10 +1,14 @@
 import { useEffect, useState, type ReactElement } from "react";
+import { getTranslations } from "../i18n";
+import { useAppStore } from "../store/useAppStore";
 
 type ProjectSummaryModalProps = {
   onClose: () => void;
 };
 
 export default function ProjectSummaryModal({ onClose }: ProjectSummaryModalProps): ReactElement {
+  const locale = useAppStore((state) => state.locale);
+  const t = getTranslations(locale);
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -22,7 +26,7 @@ export default function ProjectSummaryModal({ onClose }: ProjectSummaryModalProp
       })
       .catch((caught) => {
         if (active) {
-          setError(caught instanceof Error ? caught.message : "Failed to load project summary.");
+          setError(caught instanceof Error ? caught.message : t.projectSummary.loadError);
         }
       })
       .finally(() => {
@@ -43,7 +47,7 @@ export default function ProjectSummaryModal({ onClose }: ProjectSummaryModalProp
       await window.mao.project.saveSummary(text);
       onClose();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Failed to save project summary.");
+      setError(caught instanceof Error ? caught.message : t.projectSummary.saveError);
     } finally {
       setSaving(false);
     }
@@ -53,23 +57,23 @@ export default function ProjectSummaryModal({ onClose }: ProjectSummaryModalProp
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4">
       <div className="w-full max-w-3xl rounded border border-slate-700 bg-slate-900 shadow-xl">
         <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
-          <h2 className="text-sm font-semibold">Project Summary</h2>
+          <h2 className="text-sm font-semibold">{t.projectSummary.title}</h2>
           <button
             type="button"
             onClick={onClose}
             className="rounded px-2 py-1 text-sm text-slate-300 hover:bg-slate-800"
           >
-            Close
+            {t.projectSummary.close}
           </button>
         </div>
 
         <div className="grid gap-3 p-5">
-          {loading ? <p className="text-sm text-slate-400">Loading...</p> : null}
+          {loading ? <p className="text-sm text-slate-400">{t.projectSummary.loading}</p> : null}
           <textarea
             value={text}
             onChange={(event) => setText(event.target.value)}
             className="min-h-[400px] rounded border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm outline-none focus:border-cyan-500"
-            placeholder="Project context, conventions, constraints, and current plan..."
+            placeholder={t.projectSummary.placeholder}
           />
           {error ? <p className="text-sm text-red-300">{error}</p> : null}
         </div>
@@ -80,7 +84,7 @@ export default function ProjectSummaryModal({ onClose }: ProjectSummaryModalProp
             onClick={onClose}
             className="rounded border border-slate-700 px-3 py-2 text-sm hover:bg-slate-800"
           >
-            Cancel
+            {t.projectSummary.cancel}
           </button>
           <button
             type="button"
@@ -88,7 +92,7 @@ export default function ProjectSummaryModal({ onClose }: ProjectSummaryModalProp
             disabled={saving}
             className="rounded bg-cyan-500 px-3 py-2 text-sm font-medium text-slate-950 hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {saving ? "Saving..." : "Save"}
+            {saving ? t.projectSummary.saving : t.projectSummary.save}
           </button>
         </div>
       </div>

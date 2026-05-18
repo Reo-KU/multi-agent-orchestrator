@@ -1,4 +1,5 @@
 import { useState, type FormEvent, type ReactElement } from "react";
+import { getTranslations } from "../i18n";
 import { useAppStore } from "../store/useAppStore";
 
 export default function TaskInput(): ReactElement {
@@ -8,6 +9,8 @@ export default function TaskInput(): ReactElement {
   const pendingDispatches = useAppStore((state) => state.pendingDispatches);
   const runTask = useAppStore((state) => state.runTask);
   const dispatchToAgent = useAppStore((state) => state.dispatchToAgent);
+  const locale = useAppStore((state) => state.locale);
+  const t = getTranslations(locale);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [mode, setMode] = useState<"manual" | "auto">("manual");
@@ -22,7 +25,7 @@ export default function TaskInput(): ReactElement {
     setError(null);
 
     if (!title.trim() || !body.trim()) {
-      setError("Title and body are required.");
+      setError(t.taskInput.validation);
       return;
     }
 
@@ -32,7 +35,7 @@ export default function TaskInput(): ReactElement {
       setTitle("");
       setBody("");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Failed to run task.");
+      setError(caught instanceof Error ? caught.message : t.taskInput.runError);
     } finally {
       setRunning(false);
     }
@@ -43,9 +46,9 @@ export default function TaskInput(): ReactElement {
       <form onSubmit={(event) => void onSubmit(event)} className="grid gap-3 p-4">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-sm font-semibold">Task</h2>
+            <h2 className="text-sm font-semibold">{t.taskInput.label}</h2>
             <p className="text-xs text-slate-400">
-              Root: {rootAgent ? `${rootAgent.name} (${rootAgent.status})` : "not selected"}
+              {t.taskInput.root}: {rootAgent ? `${rootAgent.name} (${rootAgent.status})` : t.taskInput.notSelected}
             </p>
           </div>
           <div className="flex rounded border border-slate-700 p-0.5 text-xs">
@@ -54,14 +57,14 @@ export default function TaskInput(): ReactElement {
               onClick={() => setMode("manual")}
               className={`rounded px-3 py-1.5 ${mode === "manual" ? "bg-cyan-500 text-slate-950" : "text-slate-300 hover:bg-slate-800"}`}
             >
-              manual
+              {t.taskInput.modeManual}
             </button>
             <button
               type="button"
               onClick={() => setMode("auto")}
               className={`rounded px-3 py-1.5 ${mode === "auto" ? "bg-cyan-500 text-slate-950" : "text-slate-300 hover:bg-slate-800"}`}
             >
-              auto
+              {t.taskInput.modeAuto}
             </button>
           </div>
         </div>
@@ -71,20 +74,20 @@ export default function TaskInput(): ReactElement {
             value={title}
             onChange={(event) => setTitle(event.target.value)}
             className="rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm outline-none focus:border-cyan-500"
-            placeholder="Task title"
+            placeholder={t.taskInput.title}
           />
           <textarea
             value={body}
             onChange={(event) => setBody(event.target.value)}
             className="h-20 resize-none rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm outline-none focus:border-cyan-500"
-            placeholder="Detailed instruction for the root agent"
+            placeholder={t.taskInput.detail}
           />
           <button
             type="submit"
             disabled={running || !rootAgent}
             className="h-20 rounded bg-cyan-500 px-3 py-2 text-sm font-medium text-slate-950 hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {running ? "Running..." : "Run"}
+            {running ? t.taskInput.running : t.taskInput.run}
           </button>
         </div>
 
@@ -94,7 +97,7 @@ export default function TaskInput(): ReactElement {
       {pendingDispatches.length > 0 ? (
         <div className="grid gap-2 border-t border-slate-800 px-4 py-3">
           <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Manual dispatch candidates
+            {t.taskInput.candidatesLabel}
           </div>
           <div className="grid max-h-36 gap-2 overflow-y-auto">
             {pendingDispatches.map((pending) => {
@@ -106,7 +109,7 @@ export default function TaskInput(): ReactElement {
                 >
                   <div className="text-sm">
                     <div className="font-medium">{pending.agentName}</div>
-                    <div className="text-xs text-slate-400">{agent?.name ?? "unmatched"}</div>
+                    <div className="text-xs text-slate-400">{agent?.name ?? t.taskInput.unmatched}</div>
                   </div>
                   <pre className="max-h-24 overflow-auto whitespace-pre-wrap text-xs text-slate-300">
                     {pending.body}
@@ -121,7 +124,7 @@ export default function TaskInput(): ReactElement {
                     }}
                     className="rounded bg-green-500 px-3 py-2 text-sm font-medium text-green-950 hover:bg-green-400 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    Send
+                    {t.taskInput.send}
                   </button>
                 </div>
               );

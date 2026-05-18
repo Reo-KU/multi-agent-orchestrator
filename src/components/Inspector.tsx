@@ -1,24 +1,8 @@
 import { useEffect, useState, type ReactElement } from "react";
+import { getTranslations } from "../i18n";
 import { useAppStore } from "../store/useAppStore";
 import type { Agent, AgentSummary } from "../types";
 import AgentForm from "./AgentForm";
-
-const permissionHints: Record<Agent["type"], string[]> = {
-  codex: [
-    "--sandbox workspace-write  (cwd 内書き込み許可)",
-    "--dangerously-bypass-approvals-and-sandbox  (全承認スキップ・危険)"
-  ],
-  claude: [
-    "--permission-mode acceptEdits  (編集を自動承認)",
-    "--dangerously-skip-permissions  (全承認スキップ・危険)"
-  ],
-  gemini: [
-    "--approval-mode auto_edit  (編集を自動承認)",
-    "--yolo  (全承認スキップ・危険)"
-  ],
-  grok: ["(grok の権限フラグは CLI のドキュメントを参照)"],
-  custom: ["(該当 CLI のドキュメントを参照)"]
-};
 
 const policyBadgeClasses: Record<NonNullable<Agent["permissionPolicy"]>, string> = {
   ask: "border-yellow-700 bg-yellow-950/40 text-yellow-200",
@@ -30,16 +14,16 @@ const safeAutoFlags: Record<Agent["type"], string> = {
   codex: "--sandbox workspace-write",
   claude: "--permission-mode acceptEdits",
   gemini: "--approval-mode auto_edit",
-  grok: "(なし)",
-  custom: "(なし)"
+  grok: "",
+  custom: ""
 };
 
 const yoloFlags: Record<Agent["type"], string> = {
   codex: "--dangerously-bypass-approvals-and-sandbox",
   claude: "--dangerously-skip-permissions",
   gemini: "--yolo",
-  grok: "(なし)",
-  custom: "(なし)"
+  grok: "",
+  custom: ""
 };
 
 export default function Inspector(): ReactElement {
@@ -50,6 +34,8 @@ export default function Inspector(): ReactElement {
   const startAgent = useAppStore((state) => state.startAgent);
   const stopAgent = useAppStore((state) => state.stopAgent);
   const updateAgent = useAppStore((state) => state.updateAgent);
+  const locale = useAppStore((state) => state.locale);
+  const t = getTranslations(locale);
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<AgentSummary | null>(null);
@@ -61,7 +47,13 @@ export default function Inspector(): ReactElement {
   const agentMode = agent?.mode ?? "exec";
   const policy = agent?.permissionPolicy ?? "safe-auto";
   const policyFlags =
-    policy === "ask" ? "(フラグ無し)" : policy === "safe-auto" && agent ? safeAutoFlags[agent.type] : agent ? yoloFlags[agent.type] : "(なし)";
+    policy === "ask"
+      ? t.inspector.noFlags
+      : policy === "safe-auto" && agent
+        ? safeAutoFlags[agent.type] || t.inspector.noFlags
+        : agent
+          ? yoloFlags[agent.type] || t.inspector.noFlags
+          : t.inspector.noFlags;
   const isAskExecClaude = policy === "ask" && agentMode === "exec" && agent?.type === "claude";
   const isAskExecOther = policy === "ask" && agentMode === "exec" && agent?.type !== "claude";
   const isAskInteractive = policy === "ask" && agentMode === "interactive";
@@ -72,7 +64,7 @@ export default function Inspector(): ReactElement {
     try {
       setSummary(await window.mao.agent.loadSummary(agentId));
     } catch (caught) {
-      setSummaryError(caught instanceof Error ? caught.message : "Failed to load agent history.");
+      setSummaryError(caught instanceof Error ? caught.message : t.inspector.historyError);
       setSummary(null);
     } finally {
       setSummaryLoading(false);
@@ -115,24 +107,24 @@ export default function Inspector(): ReactElement {
   return (
     <aside className="flex h-full min-h-0 flex-col bg-slate-950">
       <div className="border-b border-slate-800 px-4 py-3">
-        <h2 className="text-sm font-semibold">Inspector</h2>
+        <h2 className="text-sm font-semibold">{t.inspector.title}</h2>
       </div>
 
       {!agent || !selectedNode ? (
         <div className="min-h-0 flex-1 overflow-y-auto p-4 text-sm text-slate-400">
-          Select a node to inspect its agent.
+          {t.inspector.selectPrompt}
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
           <div>
-            <div className="text-xs uppercase tracking-wide text-slate-500">Agent</div>
+            <div className="text-xs uppercase tracking-wide text-slate-500">{t.inspector.agent}</div>
             <div className="mt-1 text-base font-semibold">{agent.name}</div>
             <div className="text-sm text-slate-400">{agent.type}</div>
           </div>
 
-          <Info label="Status" value={agent.status} />
+          <Info label={t.inspector.status} value={agent.status} />
           <label className="grid gap-1 text-sm">
-            <span className="text-xs uppercase tracking-wide text-slate-500">Mode</span>
+            <span className="text-xs uppercase tracking-wide text-slate-500">{t.inspector.mode}</span>
             <select
               value={agentMode}
               onChange={(event) => {
@@ -140,12 +132,12 @@ export default function Inspector(): ReactElement {
               }}
               className="rounded border border-slate-700 bg-slate-900 px-3 py-2 outline-none focus:border-cyan-500"
             >
-              <option value="exec">Exec (recommended)</option>
-              <option value="interactive">Interactive (legacy)</option>
+              <option value="exec">{t.inspector.modeExec}</option>
+              <option value="interactive">{t.inspector.modeInteractive}</option>
             </select>
           </label>
           <div>
-            <div className="text-xs uppercase tracking-wide text-slate-500">Permission Policy</div>
+            <div className="text-xs uppercase tracking-wide text-slate-500">{t.inspector.permissionPolicy}</div>
             <div className="mt-1 flex items-center gap-2">
               <span className={`rounded border px-2 py-0.5 text-[11px] font-medium ${policyBadgeClasses[policy]}`}>
                 {policy}
@@ -157,42 +149,46 @@ export default function Inspector(): ReactElement {
               onClick={() => setEditing(true)}
               className="mt-1 text-[11px] text-cyan-400 hover:underline"
             >
-              変更 (Edit)
+              {t.inspector.edit}
             </button>
             {isAskExecClaude ? (
               <p className="mt-1 text-[11px] text-green-300">
-                ✓ claude の権限要求は MAO の承認ダイアログで都度確認します
+                {t.inspector.askExecClaudeHint}
               </p>
             ) : null}
             {isAskExecOther && agent ? (
               <p className="mt-1 text-[11px] text-yellow-400">
-                ⚠️ {agent.type} の ask は exec モードでは承認 UI が無く、CLI 既定で多くが拒否されます。
-                承認 UI が必要なら mode=interactive + 下部 Terminal、または policy=safe-auto / yolo を選択してください。
+                {t.inspector.askExecOtherHint(agent.type)}
               </p>
             ) : null}
             {isAskInteractive ? (
               <p className="mt-1 text-[11px] text-cyan-300">
-                ℹ️ interactive モード: 承認プロンプトは下部 Terminal に表示されます。タブをクリックして直接 y/n を入力してください。
+                {t.inspector.askInteractiveHint}
               </p>
             ) : null}
           </div>
-          <Info label="Command" value={[agent.command, ...(agent.args ?? [])].join(" ")} />
+          {policy === "ask" && agentMode === "interactive" ? (
+            <p className="rounded border border-slate-800 bg-slate-900/40 p-2 text-[11px] text-slate-300">
+              {t.inspector.askInteractiveHint}
+            </p>
+          ) : null}
+          <Info label={t.inspector.command} value={[agent.command, ...(agent.args ?? [])].join(" ")} />
           <details className="rounded border border-slate-800 bg-slate-900/40 p-2">
             <summary className="cursor-pointer text-xs text-slate-400">
-              権限ヒント (type={agent.type})
+              {t.inspector.permissionHintsLabel(agent.type)}
             </summary>
             <ul className="mt-2 space-y-1 text-xs text-slate-300">
-              {permissionHints[agent.type].map((line) => (
+              {t.inspector.permissionHintLines[agent.type].map((line) => (
                 <li key={line}>- {line}</li>
               ))}
             </ul>
             <p className="mt-2 text-[11px] text-slate-500">
-              Args 欄に貼り付けて使用してください。承認 UI が必要なら最下部 Terminal を直接操作することも可能です。
+              {t.inspector.permissionHintsFooter}
             </p>
           </details>
-          <Info label="Working Directory" value={agent.workingDirectory || "-"} />
-          <Info label="Role" value={agent.role || "-"} />
-          <Info label="System Prompt" value={agent.systemPrompt || "-"} multiline />
+          <Info label={t.inspector.workingDirectory} value={agent.workingDirectory || "-"} />
+          <Info label={t.inspector.role} value={agent.role || "-"} />
+          <Info label={t.inspector.systemPrompt} value={agent.systemPrompt || "-"} multiline />
 
           {error ? <p className="rounded border border-red-900/70 bg-red-950/30 p-2 text-sm text-red-200">{error}</p> : null}
 
@@ -201,10 +197,10 @@ export default function Inspector(): ReactElement {
               type="button"
               onClick={() => void start()}
               disabled={agentMode === "exec"}
-              title={agentMode === "exec" ? "exec mode は task 実行時に自動 spawn します" : undefined}
+              title={agentMode === "exec" ? t.inspector.startTooltipExec : undefined}
               className="rounded bg-green-500 px-3 py-2 text-sm font-medium text-green-950 hover:bg-green-400 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Start
+              {t.inspector.start}
             </button>
             <button
               type="button"
@@ -212,44 +208,45 @@ export default function Inspector(): ReactElement {
               disabled={agentMode === "exec" && agent.status !== "running" && agent.status !== "starting"}
               title={
                 agentMode === "exec" && agent.status !== "running" && agent.status !== "starting"
-                  ? "exec mode の Stop は実行中のみ有効"
-                  : "実行中のプロセスを終了 (SIGHUP)"
+                  ? t.inspector.stopTooltipExec
+                  : t.inspector.stopTooltipInteractive
               }
               className="rounded bg-red-500 px-3 py-2 text-sm font-medium text-red-950 hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Stop
+              {t.inspector.stop}
             </button>
             <button
               type="button"
               onClick={() => void setRoot(selectedNode.id)}
               className="rounded border border-slate-700 px-3 py-2 text-sm hover:bg-slate-800"
             >
-              Set as Root
+              {t.inspector.setAsRoot}
             </button>
             <button
               type="button"
               onClick={() => setEditing(true)}
               className="rounded border border-slate-700 px-3 py-2 text-sm hover:bg-slate-800"
             >
-              Edit
+              {t.agentList.edit}
             </button>
           </div>
 
           <div className="border-t border-slate-800 pt-4">
             <div className="mb-3 flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold">直近の応答履歴</h3>
+              <h3 className="text-sm font-semibold">{t.inspector.recentHistory}</h3>
               <button
                 type="button"
                 onClick={() => void loadSummary(agent.id)}
                 className="rounded border border-slate-700 px-2 py-1 text-xs hover:bg-slate-800"
               >
-                Refresh
+                {t.inspector.refresh}
               </button>
             </div>
             <AgentHistoryView
               summary={summary}
               loading={summaryLoading}
               error={summaryError}
+              locale={locale}
             />
           </div>
         </div>
@@ -263,14 +260,17 @@ export default function Inspector(): ReactElement {
 function AgentHistoryView({
   summary,
   loading,
-  error
+  error,
+  locale
 }: {
   summary: AgentSummary | null;
   loading: boolean;
   error: string | null;
+  locale: "en" | "ja";
 }): ReactElement {
+  const t = getTranslations(locale);
   if (loading) {
-    return <p className="text-sm text-slate-400">Loading...</p>;
+    return <p className="text-sm text-slate-400">{t.inspector.historyLoading}</p>;
   }
 
   if (error) {
@@ -279,7 +279,7 @@ function AgentHistoryView({
 
   const entries = summary?.recentEntries.slice(0, 5) ?? [];
   if (entries.length === 0) {
-    return <p className="text-sm text-slate-500">履歴なし</p>;
+    return <p className="text-sm text-slate-500">{t.inspector.historyEmpty}</p>;
   }
 
   return (
@@ -292,14 +292,14 @@ function AgentHistoryView({
           <div className="mb-2 flex items-center justify-between gap-2 text-xs text-slate-400">
             <span>{formatTime(entry.at)} · task:{entry.taskId.slice(-6)}</span>
             <span className="rounded bg-slate-800 px-2 py-0.5 text-slate-300">
-              → {entry.emittedDispatches.length} dispatch
+              {t.inspector.historyDispatchBadge(entry.emittedDispatches.length)}
             </span>
           </div>
           <div className="truncate text-xs text-slate-300" title={entry.receivedBody}>
-            {entry.receivedBody || "(empty input)"}
+            {entry.receivedBody || t.inspector.historyEmptyInput}
           </div>
           <pre className="mt-2 max-h-20 overflow-auto whitespace-pre-wrap text-xs text-slate-400">
-            {entry.responseLastMessage || "(no response)"}
+            {entry.responseLastMessage || t.inspector.historyEmptyResponse}
           </pre>
         </div>
       ))}

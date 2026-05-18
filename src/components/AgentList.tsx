@@ -1,4 +1,5 @@
 import { useState, type ReactElement } from "react";
+import { getTranslations } from "../i18n";
 import { useAppStore } from "../store/useAppStore";
 import type { Agent } from "../types";
 import AgentForm from "./AgentForm";
@@ -9,6 +10,8 @@ export default function AgentList(): ReactElement {
   const addNode = useAppStore((state) => state.addNode);
   const deleteAgent = useAppStore((state) => state.deleteAgent);
   const selectNode = useAppStore((state) => state.selectNode);
+  const locale = useAppStore((state) => state.locale);
+  const t = getTranslations(locale);
   const [formAgent, setFormAgent] = useState<Agent | null | undefined>(undefined);
 
   const selectAgent = (agentId: string): void => {
@@ -21,20 +24,20 @@ export default function AgentList(): ReactElement {
   return (
     <aside className="flex h-full min-h-0 flex-col bg-slate-950">
       <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
-        <h2 className="text-sm font-semibold">Agents</h2>
+        <h2 className="text-sm font-semibold">{t.agentList.title}</h2>
         <button
           type="button"
           onClick={() => setFormAgent(null)}
           className="rounded bg-cyan-500 px-2.5 py-1.5 text-xs font-medium text-slate-950 hover:bg-cyan-400"
         >
-          + Add Agent
+          {t.agentList.addAgent}
         </button>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3">
         {agents.length === 0 ? (
           <p className="rounded border border-dashed border-slate-700 p-3 text-sm text-slate-400">
-            No agents registered.
+            {t.agentList.empty}
           </p>
         ) : null}
 
@@ -63,7 +66,7 @@ export default function AgentList(): ReactElement {
                   }}
                   className="rounded border border-slate-700 px-2 py-1 text-xs hover:bg-slate-800"
                 >
-                  Edit
+                  {t.agentList.edit}
                 </button>
                 <button
                   type="button"
@@ -73,7 +76,7 @@ export default function AgentList(): ReactElement {
                   }}
                   className="rounded border border-red-900/70 px-2 py-1 text-xs text-red-300 hover:bg-red-950/40"
                 >
-                  Delete
+                  {t.agentList.delete}
                 </button>
                 {!hasNode ? (
                   <button
@@ -84,7 +87,7 @@ export default function AgentList(): ReactElement {
                     }}
                     className="rounded border border-slate-700 px-2 py-1 text-xs hover:bg-slate-800"
                   >
-                    Add Node
+                    {t.agentList.addNode}
                   </button>
                 ) : null}
               </div>

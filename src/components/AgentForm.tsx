@@ -1,4 +1,5 @@
 import { useMemo, useState, type FormEvent, type ReactElement } from "react";
+import { getTranslations } from "../i18n";
 import { useAppStore } from "../store/useAppStore";
 import type { Agent } from "../types";
 
@@ -27,6 +28,8 @@ const emptyAgent = (): Agent => ({
 export default function AgentForm({ agent, onClose }: AgentFormProps): ReactElement {
   const addAgent = useAppStore((state) => state.addAgent);
   const updateAgent = useAppStore((state) => state.updateAgent);
+  const locale = useAppStore((state) => state.locale);
+  const t = getTranslations(locale);
   const initial = useMemo(() => agent ?? emptyAgent(), [agent]);
   const [draft, setDraft] = useState<Agent>(initial);
   const [argsText, setArgsText] = useState((initial.args ?? []).join("\n"));
@@ -42,7 +45,7 @@ export default function AgentForm({ agent, onClose }: AgentFormProps): ReactElem
     setError(null);
 
     if (!draft.name.trim() || !draft.command.trim()) {
-      setError("Name and command are required.");
+      setError(t.agentForm.validation);
       return;
     }
 
@@ -70,7 +73,7 @@ export default function AgentForm({ agent, onClose }: AgentFormProps): ReactElem
       }
       onClose();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Failed to save agent.");
+      setError(caught instanceof Error ? caught.message : t.agentForm.saveError);
     } finally {
       setSaving(false);
     }
@@ -83,19 +86,19 @@ export default function AgentForm({ agent, onClose }: AgentFormProps): ReactElem
         className="w-full max-w-2xl rounded border border-slate-700 bg-slate-900 shadow-xl"
       >
         <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
-          <h2 className="text-sm font-semibold">{agent ? "Edit Agent" : "Add Agent"}</h2>
+          <h2 className="text-sm font-semibold">{agent ? t.agentForm.titleEdit : t.agentForm.titleNew}</h2>
           <button
             type="button"
             onClick={onClose}
             className="rounded px-2 py-1 text-sm text-slate-300 hover:bg-slate-800"
           >
-            Close
+            {t.agentForm.close}
           </button>
         </div>
 
         <div className="grid max-h-[72vh] gap-4 overflow-y-auto p-5">
           <label className="grid gap-1 text-sm">
-            <span className="text-slate-300">Name</span>
+            <span className="text-slate-300">{t.agentForm.name}</span>
             <input
               value={draft.name}
               onChange={(event) => update("name", event.target.value)}
@@ -105,7 +108,7 @@ export default function AgentForm({ agent, onClose }: AgentFormProps): ReactElem
           </label>
 
           <label className="grid gap-1 text-sm">
-            <span className="text-slate-300">Type</span>
+            <span className="text-slate-300">{t.agentForm.type}</span>
             <select
               value={draft.type}
               onChange={(event) => update("type", event.target.value as Agent["type"])}
@@ -120,7 +123,7 @@ export default function AgentForm({ agent, onClose }: AgentFormProps): ReactElem
           </label>
 
           <label className="grid gap-1 text-sm">
-            <span className="text-slate-300">Mode</span>
+            <span className="text-slate-300">{t.agentForm.mode}</span>
             <select
               value={draft.mode ?? "exec"}
               onChange={(event) => update("mode", event.target.value as Agent["mode"])}
@@ -132,7 +135,7 @@ export default function AgentForm({ agent, onClose }: AgentFormProps): ReactElem
           </label>
 
           <label className="grid gap-1 text-sm">
-            <span className="text-slate-300">Permission Policy</span>
+            <span className="text-slate-300">{t.agentForm.permissionPolicy}</span>
             <select
               value={draft.permissionPolicy ?? "safe-auto"}
               onChange={(event) =>
@@ -140,18 +143,18 @@ export default function AgentForm({ agent, onClose }: AgentFormProps): ReactElem
               }
               className="rounded border border-slate-700 bg-slate-950 px-3 py-2 outline-none focus:border-cyan-500"
             >
-              <option value="ask">ask (フラグ無し・TUI 任せ)</option>
-              <option value="safe-auto">safe-auto (cwd 内書込み許可・推奨)</option>
-              <option value="yolo">yolo (全承認スキップ・危険)</option>
+              <option value="ask">{t.agentForm.permissionAsk}</option>
+              <option value="safe-auto">{t.agentForm.permissionSafeAuto}</option>
+              <option value="yolo">{t.agentForm.permissionYolo}</option>
             </select>
             <span className="text-[11px] text-slate-500">
-              safe-auto は cwd 内書き込みのみ自動承認。yolo は何でも実行可能なので注意。
+              {t.agentForm.permissionHint}
             </span>
           </label>
 
           <div className="grid grid-cols-2 gap-4">
             <label className="grid gap-1 text-sm">
-              <span className="text-slate-300">Command</span>
+              <span className="text-slate-300">{t.agentForm.command}</span>
               <input
                 value={draft.command}
                 onChange={(event) => update("command", event.target.value)}
@@ -161,7 +164,7 @@ export default function AgentForm({ agent, onClose }: AgentFormProps): ReactElem
             </label>
 
             <label className="grid gap-1 text-sm">
-              <span className="text-slate-300">Args</span>
+              <span className="text-slate-300">{t.agentForm.args}</span>
               <input
                 value={argsText}
                 onChange={(event) => setArgsText(event.target.value)}
@@ -172,7 +175,7 @@ export default function AgentForm({ agent, onClose }: AgentFormProps): ReactElem
           </div>
 
           <label className="grid gap-1 text-sm">
-            <span className="text-slate-300">Working Directory</span>
+            <span className="text-slate-300">{t.agentForm.workingDirectory}</span>
             <input
               value={draft.workingDirectory}
               onChange={(event) => update("workingDirectory", event.target.value)}
@@ -182,7 +185,7 @@ export default function AgentForm({ agent, onClose }: AgentFormProps): ReactElem
           </label>
 
           <label className="grid gap-1 text-sm">
-            <span className="text-slate-300">Role</span>
+            <span className="text-slate-300">{t.agentForm.role}</span>
             <input
               value={draft.role}
               onChange={(event) => update("role", event.target.value)}
@@ -192,7 +195,7 @@ export default function AgentForm({ agent, onClose }: AgentFormProps): ReactElem
           </label>
 
           <label className="grid gap-1 text-sm">
-            <span className="text-slate-300">System Prompt</span>
+            <span className="text-slate-300">{t.agentForm.systemPrompt}</span>
             <textarea
               value={draft.systemPrompt}
               onChange={(event) => update("systemPrompt", event.target.value)}
@@ -210,14 +213,14 @@ export default function AgentForm({ agent, onClose }: AgentFormProps): ReactElem
             onClick={onClose}
             className="rounded border border-slate-700 px-3 py-2 text-sm hover:bg-slate-800"
           >
-            Cancel
+            {t.agentForm.cancel}
           </button>
           <button
             type="submit"
             disabled={saving}
             className="rounded bg-cyan-500 px-3 py-2 text-sm font-medium text-slate-950 hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {saving ? "Saving..." : "Save"}
+            {saving ? t.agentForm.saving : t.agentForm.save}
           </button>
         </div>
       </form>

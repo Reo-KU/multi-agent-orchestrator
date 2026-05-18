@@ -1,0 +1,136 @@
+import type { Translations } from "./en";
+
+export const ja: Translations = {
+  app: { title: "Multi-Agent CLI Orchestrator" },
+  header: {
+    projectSummary: "Project Summary",
+    locale: "言語",
+    resizeLeftTooltip: "ドラッグして左パネルの幅を変更",
+    resizeRightTooltip: "ドラッグして右パネルの幅を変更"
+  },
+  agentList: {
+    title: "Agents",
+    addAgent: "+ Add Agent",
+    empty: "No agents registered.",
+    edit: "Edit",
+    delete: "Delete",
+    addNode: "Add Node"
+  },
+  agentForm: {
+    titleNew: "Add Agent",
+    titleEdit: "Edit Agent",
+    name: "Name",
+    type: "Type",
+    mode: "Mode",
+    permissionPolicy: "Permission Policy",
+    permissionHint: "safe-auto は cwd 内書き込みのみ自動承認。yolo は何でも実行可能なので注意。",
+    permissionAsk: "ask (フラグ無し・TUI 任せ)",
+    permissionSafeAuto: "safe-auto (cwd 内書込み許可・推奨)",
+    permissionYolo: "yolo (全承認スキップ・危険)",
+    command: "Command",
+    args: "Args",
+    workingDirectory: "Working Directory",
+    role: "Role",
+    systemPrompt: "System Prompt",
+    save: "Save",
+    saving: "Saving...",
+    cancel: "Cancel",
+    close: "Close",
+    validation: "Name and command are required.",
+    saveError: "Failed to save agent."
+  },
+  inspector: {
+    title: "Inspector",
+    selectPrompt: "Select a node to inspect its agent.",
+    status: "Status",
+    mode: "Mode",
+    modeExec: "Exec (recommended)",
+    modeInteractive: "Interactive (legacy)",
+    permissionPolicy: "Permission Policy",
+    edit: "変更 (Edit)",
+    askExecClaudeHint: "claude の権限要求は MAO の承認ダイアログで都度確認します",
+    askExecOtherHint: (type: string) =>
+      `${type} の ask は exec モードでは承認 UI が無く、CLI 既定で多くが拒否されます。承認 UI が必要なら mode=interactive + 下部 Terminal、または policy=safe-auto / yolo を選択してください。`,
+    askInteractiveHint: "interactive モード: 承認プロンプトは下部 Terminal に表示されます。タブをクリックして直接 y/n を入力してください。",
+    permissionHintsLabel: (type: string) => `権限ヒント (type=${type})`,
+    permissionHintsFooter: "Args 欄に貼り付けて使用してください。承認 UI が必要なら最下部 Terminal を直接操作することも可能です。",
+    permissionHintLines: {
+      codex: ["--sandbox workspace-write  (cwd 内書き込み許可)", "--dangerously-bypass-approvals-and-sandbox  (全承認スキップ・危険)"],
+      claude: ["--permission-mode acceptEdits  (編集を自動承認)", "--dangerously-skip-permissions  (全承認スキップ・危険)"],
+      gemini: ["--approval-mode auto_edit  (編集を自動承認)", "--yolo  (全承認スキップ・危険)"],
+      grok: ["(grok の権限フラグは CLI のドキュメントを参照)"],
+      custom: ["(該当 CLI のドキュメントを参照)"]
+    },
+    noFlags: "(なし)",
+    command: "Command",
+    workingDirectory: "Working Directory",
+    role: "Role",
+    systemPrompt: "System Prompt",
+    start: "Start",
+    stop: "Stop",
+    startTooltipExec: "exec mode は task 実行時に自動 spawn します",
+    stopTooltipExec: "exec mode の Stop は実行中のみ有効",
+    stopTooltipInteractive: "実行中のプロセスを終了 (SIGHUP)",
+    setAsRoot: "Set as Root",
+    recentHistory: "直近の応答履歴",
+    refresh: "Refresh",
+    historyLoading: "Loading...",
+    historyError: "Failed to load agent history.",
+    historyEmpty: "履歴なし",
+    historyEmptyInput: "(empty input)",
+    historyEmptyResponse: "(no response)",
+    historyDispatchBadge: (n: number) => `→ ${n} dispatch`,
+    agent: "Agent"
+  },
+  mindMap: {
+    setAsRoot: "Set as Root",
+    deleteNode: "Delete Node",
+    missingAgent: "Missing agent",
+    root: "Root"
+  },
+  taskInput: {
+    label: "Task",
+    root: "Root",
+    notSelected: "not selected",
+    title: "Task title",
+    detail: "Detailed instruction for the root agent",
+    run: "Run",
+    running: "Running...",
+    modeManual: "manual",
+    modeAuto: "auto",
+    candidatesLabel: "Manual dispatch candidates",
+    send: "Send",
+    unmatched: "unmatched",
+    validation: "Title and body are required.",
+    runError: "Failed to run task."
+  },
+  terminal: {
+    noSessions: "No terminal sessions",
+    ctrlC: "^C",
+    ctrlCTooltip: "Send Ctrl+C (SIGINT) to this agent",
+    stop: "Stop",
+    stopTooltip: "Kill this agent's running process (SIGHUP)",
+    placeholder: "Terminal output will appear here.",
+    agentTitleSuffix: " terminal"
+  },
+  projectSummary: {
+    title: "Project Summary",
+    placeholder: "Describe the workspace here. This is injected at the top of every agent prompt.",
+    save: "Save",
+    saving: "Saving...",
+    cancel: "Cancel",
+    close: "Close",
+    loadError: "Failed to load project summary.",
+    saveError: "Failed to save project summary.",
+    loading: "Loading..."
+  },
+  permissionDialog: {
+    title: "Permission Request",
+    agent: "Agent",
+    tool: "Tool",
+    input: "Input",
+    deny: "Deny",
+    approve: "Approve",
+    morePending: (n: number) => `+ ${n} more pending`
+  }
+};

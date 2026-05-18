@@ -6,6 +6,7 @@ import fs from "fs-extra";
 import * as pty from "node-pty";
 import type {
   Agent,
+  AgentLocale,
   AgentMode,
   AgentRunRequest,
   AgentRunResult,
@@ -39,6 +40,100 @@ const ALLOWED_COMMANDS = new Set(["claude", "codex", "grok", "gemini", "sh", "ba
 
 const truncate = (value: string, maxLength: number): string =>
   value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
+
+type PromptStrings = {
+  projectInfo: string;
+  recentHistory: string;
+  receivedLabel: string;
+  responseLabel: string;
+  currentTaskContext: string;
+  taskId: string;
+  title: string;
+  originalInstruction: string;
+  dispatchesSoFar: string;
+  receivedInstruction: string;
+  responseRules: string;
+  responseRuleLines: string[];
+  yourPosition: string;
+  youAre: (name: string, role: string) => string;
+  roleUnset: string;
+  descendantTree: string;
+  directChildren: string;
+  none: string;
+  dispatchInstruction: string;
+  signalHeader: string;
+  signalIntro: string;
+  signalNote1: string;
+  signalNote2: string;
+  signalNote3: string;
+};
+
+const promptStringsJa: PromptStrings = {
+  projectInfo: "プロジェクト情報",
+  recentHistory: "あなたの直近の応答履歴",
+  receivedLabel: "受信",
+  responseLabel: "応答",
+  currentTaskContext: "現在のタスク文脈",
+  taskId: "タスクID",
+  title: "タイトル",
+  originalInstruction: "当初指示 (ユーザーから)",
+  dispatchesSoFar: "これまでの分配",
+  receivedInstruction: "受信した指示",
+  responseRules: "応答ルール",
+  responseRuleLines: [
+    "- 子エージェントへ転送する場合のみ [TO: <名前>]\\n<本文> 形式で出力",
+    "- 末端タスクの場合は最小限の出力 (1単語〜1文)",
+    "- codex 内部の Spawn / Codex Apps / MCP 機能は使わない",
+    "- 「ツールがない」と言わない。stdout に [TO:] を出すこと自体が配送"
+  ],
+  yourPosition: "MAO グラフ上のあなたの位置",
+  youAre: (name, role) => `あなたは ${name} です。役割: ${role}`,
+  roleUnset: "役割未設定",
+  descendantTree: "あなた以下の子孫ツリー",
+  directChildren: "直接の子エージェント",
+  none: "なし",
+  dispatchInstruction: "子エージェントへ配送する場合は、stdout に [TO: <エージェント名>] の形式で出力してください。",
+  signalHeader: "MAO 完了通知 (必須・厳守)",
+  signalIntro: "上記タスクの応答が完了したら、必ず最後に以下を shell で1行だけ実行してください:",
+  signalNote1: "このコマンドの実行を MAO はタスク完了の signal として検知します。",
+  signalNote2: "実行しないと MAO は完了を検知できず、最大5分タイムアウト待ちになります。",
+  signalNote3: "[TO: ...] ブロックがある場合は応答中に出力し、その後に上記の echo を出してください。"
+};
+
+const promptStringsEn: PromptStrings = {
+  projectInfo: "Project Information",
+  recentHistory: "Your recent response history",
+  receivedLabel: "received",
+  responseLabel: "response",
+  currentTaskContext: "Current task context",
+  taskId: "Task ID",
+  title: "Title",
+  originalInstruction: "Original instruction (from user)",
+  dispatchesSoFar: "Dispatches so far",
+  receivedInstruction: "Received instruction",
+  responseRules: "Response rules",
+  responseRuleLines: [
+    "- Only output [TO: <name>]\\n<body> format when delegating to a child agent",
+    "- For leaf tasks, output minimally (single word or single sentence)",
+    "- Do not use codex's internal Spawn / Codex Apps / MCP features",
+    '- Do not say "no tool available". Writing [TO:] to stdout *is* the dispatch.'
+  ],
+  yourPosition: "Your position in the MAO graph",
+  youAre: (name, role) => `You are ${name}. Role: ${role}`,
+  roleUnset: "role unset",
+  descendantTree: "Your descendant tree",
+  directChildren: "Direct child agents",
+  none: "none",
+  dispatchInstruction: "To dispatch to a child agent, write [TO: <agent-name>] on stdout.",
+  signalHeader: "MAO completion signal (REQUIRED)",
+  signalIntro: "When the task above is fully done, run this single shell command as your last action:",
+  signalNote1: "MAO detects task completion via this exact command.",
+  signalNote2: "Without it, MAO waits up to 5 minutes before timing out.",
+  signalNote3: "If you have [TO: ...] blocks, output them during your response and then run the echo above."
+};
+
+const getPromptStrings = (locale: AgentLocale | undefined): PromptStrings =>
+  (locale ?? "ja") === "en" ? promptStringsEn : promptStringsJa;
 
 const getCommandName = (command: string): string => {
   const normalized = command.trim();
@@ -158,7 +253,7 @@ const buildRunArgs = (
   };
 };
 
-const buildGraphIntro = (agent: Agent, graph: GraphSnapshotForContext): string => {
+const buildGraphIntro = (agent: Agent, graph: GraphSnapshotForContext, t: PromptStrings): string => {
   const ownNode = graph.nodes.find((node) => node.agentId === agent.id);
   if (!ownNode) {
     return "";
@@ -181,7 +276,7 @@ const buildGraphIntro = (agent: Agent, graph: GraphSnapshotForContext): string =
     const nextSeen = new Set(seen);
     nextSeen.add(agentId);
     const indent = "  ".repeat(depth);
-    const lines = [`${indent}- ${node.name} (${node.role || "role unset"})${node.isRoot ? " [root]" : ""}`];
+    const lines = [`${indent}- ${node.name} (${node.role || t.roleUnset})${node.isRoot ? " [root]" : ""}`];
 
     for (const childId of childrenByAgentId.get(agentId) ?? []) {
       lines.push(...renderTree(childId, depth + 1, nextSeen));
@@ -195,40 +290,44 @@ const buildGraphIntro = (agent: Agent, graph: GraphSnapshotForContext): string =
     .filter((node): node is NonNullable<typeof node> => Boolean(node));
 
   const lines = [
-    "## MAO グラフ上のあなたの位置",
-    `あなたは ${ownNode.name} です。役割: ${ownNode.role || agent.role || "未設定"}`,
+    `## ${t.yourPosition}`,
+    t.youAre(ownNode.name, ownNode.role || agent.role || t.roleUnset),
     "",
-    "### あなた以下の子孫ツリー",
+    `### ${t.descendantTree}`,
     ...renderTree(agent.id),
     "",
-    "### 直接の子エージェント",
+    `### ${t.directChildren}`,
     directChildren.length > 0
-      ? directChildren.map((child) => `- ${child.name}: ${child.role || "role unset"}`).join("\n")
-      : "- なし",
+      ? directChildren.map((child) => `- ${child.name}: ${child.role || t.roleUnset}`).join("\n")
+      : `- ${t.none}`,
     "",
-    "子エージェントへ配送する場合は、stdout に [TO: <エージェント名>] の形式で出力してください。"
+    t.dispatchInstruction
   ];
 
   return lines.join("\n");
 };
 
 const composePrompt = (agent: Agent, body: string, ctx: ContextSnapshot): string => {
+  const t = getPromptStrings(ctx.locale);
   const sections: string[] = [];
   const ownNode = ctx.graph.nodes.find((node) => node.agentId === agent.id);
 
   if (ownNode) {
-    sections.push(buildGraphIntro(agent, ctx.graph));
+    sections.push(buildGraphIntro(agent, ctx.graph, t));
   }
 
   if (ctx.projectSummary.trim().length > 0) {
-    sections.push(`## プロジェクト情報\n${ctx.projectSummary.trim()}`);
+    sections.push(`## ${t.projectInfo}\n${ctx.projectSummary.trim()}`);
   }
 
   if (ctx.agentSummary && ctx.agentSummary.recentEntries.length > 0) {
-    const lines = ["## あなたの直近の応答履歴"];
+    const lines = [`## ${t.recentHistory}`];
     for (const entry of ctx.agentSummary.recentEntries.slice(-5)) {
       lines.push(
-        `- task ${entry.taskId.slice(-6)}: 受信="${truncate(entry.receivedBody, 60)}" 応答="${truncate(
+        `- task ${entry.taskId.slice(-6)}: ${t.receivedLabel}="${truncate(
+          entry.receivedBody,
+          60
+        )}" ${t.responseLabel}="${truncate(
           entry.responseLastMessage,
           60
         )}"`
@@ -239,14 +338,14 @@ const composePrompt = (agent: Agent, body: string, ctx: ContextSnapshot): string
 
   if (ctx.taskState) {
     const lines = [
-      "## 現在のタスク文脈",
-      `- タスクID: ${ctx.taskState.taskId}`,
-      `- タイトル: ${ctx.taskState.title}`,
-      `- 当初指示 (ユーザーから): ${truncate(ctx.taskState.originalBody, 200)}`
+      `## ${t.currentTaskContext}`,
+      `- ${t.taskId}: ${ctx.taskState.taskId}`,
+      `- ${t.title}: ${ctx.taskState.title}`,
+      `- ${t.originalInstruction}: ${truncate(ctx.taskState.originalBody, 200)}`
     ];
 
     if (ctx.taskState.dispatchHistory.length > 0) {
-      lines.push("- これまでの分配:");
+      lines.push(`- ${t.dispatchesSoFar}:`);
       for (const dispatch of ctx.taskState.dispatchHistory) {
         const fromName = ctx.graph.nodes.find((node) => node.agentId === dispatch.from)?.name ?? dispatch.from;
         const toName = ctx.graph.nodes.find((node) => node.agentId === dispatch.to)?.name ?? dispatch.to;
@@ -257,14 +356,11 @@ const composePrompt = (agent: Agent, body: string, ctx: ContextSnapshot): string
     sections.push(lines.join("\n"));
   }
 
-  sections.push("## 受信した指示");
+  sections.push(`## ${t.receivedInstruction}`);
   sections.push(body);
   sections.push("");
-  sections.push("## 応答ルール");
-  sections.push("- 子エージェントへ転送する場合のみ [TO: <名前>]\\n<本文> 形式で出力");
-  sections.push("- 末端タスクの場合は最小限の出力 (1単語〜1文)");
-  sections.push("- codex 内部の Spawn / Codex Apps / MCP 機能は使わない");
-  sections.push("- 「ツールがない」と言わない。stdout に [TO:] を出すこと自体が配送");
+  sections.push(`## ${t.responseRules}`);
+  sections.push(...t.responseRuleLines);
 
   return sections.join("\n\n");
 };
@@ -462,17 +558,18 @@ export class AgentRunner extends EventEmitter {
     const taskCallId = randomUUID();
     // 区切り文字を入れない単一トークン。エスケープに依存しないので printf/echo どちらでも壊れない。
     const signalToken = `MAO_DONE_${taskCallId}`;
+    const t = getPromptStrings(req.context.locale);
     const basePrompt = composePrompt(agent, req.body, req.context);
     const signalInstruction = [
       "",
-      "## MAO 完了通知 (必須・厳守)",
-      "上記タスクの応答が完了したら、必ず最後に以下を shell で1行だけ実行してください:",
+      `## ${t.signalHeader}`,
+      t.signalIntro,
       "",
       `  echo "${signalToken}" >> "${TASK_SIGNALS_PATH}"`,
       "",
-      "このコマンドの実行を MAO はタスク完了の signal として検知します。",
-      "実行しないと MAO は完了を検知できず、最大5分タイムアウト待ちになります。",
-      "[TO: ...] ブロックがある場合は応答中に出力し、その後に上記の echo を出してください。"
+      t.signalNote1,
+      t.signalNote2,
+      t.signalNote3
     ].join("\n");
     const fullPrompt = `${basePrompt}\n\n${signalInstruction}`;
 

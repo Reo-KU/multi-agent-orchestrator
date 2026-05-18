@@ -1,5 +1,6 @@
 export type AgentMode = "exec" | "interactive";
 export type PermissionPolicy = "ask" | "safe-auto" | "yolo";
+export type AgentLocale = "en" | "ja";
 
 export type Agent = {
   id: string;
@@ -93,6 +94,7 @@ export type ContextSnapshot = {
   projectSummary: string;
   agentSummary: AgentSummary | null;
   graph: GraphSnapshotForContext;
+  locale?: AgentLocale;
 };
 
 export type AgentRunRequest = {

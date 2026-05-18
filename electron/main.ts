@@ -146,7 +146,7 @@ const initializeStorage = async (): Promise<void> => {
   if (!(await fs.pathExists(PROJECT_SUMMARY_PATH))) {
     await fs.writeFile(
       PROJECT_SUMMARY_PATH,
-      "# Project Summary\n\n(ここに workspace の概要を書く。各エージェントの prompt 先頭に注入される)\n",
+      "# Project Summary\n\n(Describe the workspace here. This is injected at the top of every agent prompt.)\n",
       "utf8"
     );
   }

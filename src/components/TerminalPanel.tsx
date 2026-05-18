@@ -2,12 +2,15 @@ import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
+import { getTranslations } from "../i18n";
 import { useAppStore } from "../store/useAppStore";
 import { maskSecrets } from "../utils/maskSecrets";
 
 export default function TerminalPanel(): ReactElement {
   const agents = useAppStore((state) => state.agents);
   const logs = useAppStore((state) => state.logs);
+  const locale = useAppStore((state) => state.locale);
+  const t = getTranslations(locale);
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const terminalRef = useRef<Terminal | null>(null);
@@ -114,7 +117,7 @@ export default function TerminalPanel(): ReactElement {
       <div className="flex h-full min-h-0 flex-col">
         <div className="flex items-center gap-1 overflow-x-auto border-b border-slate-800 px-3 py-2">
           {agents.length === 0 ? (
-            <span className="text-xs text-slate-500">No terminal sessions</span>
+            <span className="text-xs text-slate-500">{t.terminal.noSessions}</span>
           ) : null}
           {agents.map((agent) => (
             <button
@@ -138,19 +141,19 @@ export default function TerminalPanel(): ReactElement {
               <button
                 type="button"
                 onClick={() => void window.mao.pty.write(activeAgent.id, "\x03")}
-                title="Send Ctrl+C (SIGINT) to this agent"
+                title={t.terminal.ctrlCTooltip}
                 className="rounded border border-slate-800 px-2 py-1 text-[11px] text-slate-300 hover:bg-slate-900"
               >
-                ^C
+                {t.terminal.ctrlC}
               </button>
               <button
                 type="button"
                 onClick={() => void window.mao.pty.kill(activeAgent.id)}
                 disabled={activeAgent.status !== "running" && activeAgent.status !== "starting"}
-                title="Kill this agent's running process (SIGHUP)"
+                title={t.terminal.stopTooltip}
                 className="rounded bg-red-500 px-2.5 py-1 text-[11px] font-medium text-red-950 hover:bg-red-400 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:text-slate-500"
               >
-                ■ Stop
+                {t.terminal.stop}
               </button>
             </div>
           ) : null}
@@ -161,7 +164,7 @@ export default function TerminalPanel(): ReactElement {
               <iframe
                 src={`${ttydUrl}?arg=&fontSize=12`}
                 className="h-full w-full rounded border border-slate-800 bg-slate-950"
-                title={`${activeAgent.name} terminal`}
+                title={`${activeAgent.name}${t.terminal.agentTitleSuffix}`}
                 allow="clipboard-read; clipboard-write"
               />
             ) : (
@@ -169,7 +172,7 @@ export default function TerminalPanel(): ReactElement {
             )
           ) : (
             <div className="flex h-full items-center justify-center rounded border border-slate-800 text-sm text-slate-500">
-              Terminal output will appear here.
+              {t.terminal.placeholder}
             </div>
           )}
         </div>

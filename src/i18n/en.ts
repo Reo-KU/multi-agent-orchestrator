@@ -1,0 +1,136 @@
+export const en = {
+  app: { title: "Multi-Agent CLI Orchestrator" },
+  header: {
+    projectSummary: "Project Summary",
+    locale: "Language",
+    resizeLeftTooltip: "Drag to resize the left panel",
+    resizeRightTooltip: "Drag to resize the right panel"
+  },
+  agentList: {
+    title: "Agents",
+    addAgent: "+ Add Agent",
+    empty: "No agents registered.",
+    edit: "Edit",
+    delete: "Delete",
+    addNode: "Add Node"
+  },
+  agentForm: {
+    titleNew: "Add Agent",
+    titleEdit: "Edit Agent",
+    name: "Name",
+    type: "Type",
+    mode: "Mode",
+    permissionPolicy: "Permission Policy",
+    permissionHint: "safe-auto only auto-approves edits inside the cwd. yolo can do anything; use with caution.",
+    permissionAsk: "ask (no flags; leave prompts to TUI)",
+    permissionSafeAuto: "safe-auto (allow cwd writes; recommended)",
+    permissionYolo: "yolo (skip all approvals; dangerous)",
+    command: "Command",
+    args: "Args",
+    workingDirectory: "Working Directory",
+    role: "Role",
+    systemPrompt: "System Prompt",
+    save: "Save",
+    saving: "Saving...",
+    cancel: "Cancel",
+    close: "Close",
+    validation: "Name and command are required.",
+    saveError: "Failed to save agent."
+  },
+  inspector: {
+    title: "Inspector",
+    selectPrompt: "Select a node to inspect its agent.",
+    status: "Status",
+    mode: "Mode",
+    modeExec: "Exec (recommended)",
+    modeInteractive: "Interactive (legacy)",
+    permissionPolicy: "Permission Policy",
+    edit: "Change (Edit)",
+    askExecClaudeHint: "Permission requests from claude are confirmed via the MAO approval dialog.",
+    askExecOtherHint: (type: string) =>
+      `ask + exec is not supported for ${type}; the CLI silently denies operations. Switch to mode=interactive + bottom Terminal, or pick safe-auto/yolo.`,
+    askInteractiveHint: "Interactive: approval prompts appear in the bottom Terminal. Click the tab and type y/n directly.",
+    permissionHintsLabel: (type: string) => `Permission hints (type=${type})`,
+    permissionHintsFooter: "Paste into Args. The bottom Terminal can also handle approval directly.",
+    permissionHintLines: {
+      codex: ["--sandbox workspace-write  (allow writes inside cwd)", "--dangerously-bypass-approvals-and-sandbox  (skip all approvals; dangerous)"],
+      claude: ["--permission-mode acceptEdits  (auto-approve edits)", "--dangerously-skip-permissions  (skip all approvals; dangerous)"],
+      gemini: ["--approval-mode auto_edit  (auto-approve edits)", "--yolo  (skip all approvals; dangerous)"],
+      grok: ["(see the grok CLI documentation for permission flags)"],
+      custom: ["(see the CLI documentation)"]
+    },
+    noFlags: "(none)",
+    command: "Command",
+    workingDirectory: "Working Directory",
+    role: "Role",
+    systemPrompt: "System Prompt",
+    start: "Start",
+    stop: "Stop",
+    startTooltipExec: "exec mode auto-spawns on task run",
+    stopTooltipExec: "exec mode Stop only works while running",
+    stopTooltipInteractive: "Kill the running process (SIGHUP)",
+    setAsRoot: "Set as Root",
+    recentHistory: "Recent response history",
+    refresh: "Refresh",
+    historyLoading: "Loading...",
+    historyError: "Failed to load agent history.",
+    historyEmpty: "No history yet",
+    historyEmptyInput: "(empty input)",
+    historyEmptyResponse: "(no response)",
+    historyDispatchBadge: (n: number) => `to ${n} dispatch`,
+    agent: "Agent"
+  },
+  mindMap: {
+    setAsRoot: "Set as Root",
+    deleteNode: "Delete Node",
+    missingAgent: "Missing agent",
+    root: "Root"
+  },
+  taskInput: {
+    label: "Task",
+    root: "Root",
+    notSelected: "not selected",
+    title: "Task title",
+    detail: "Detailed instruction for the root agent",
+    run: "Run",
+    running: "Running...",
+    modeManual: "manual",
+    modeAuto: "auto",
+    candidatesLabel: "Manual dispatch candidates",
+    send: "Send",
+    unmatched: "unmatched",
+    validation: "Title and body are required.",
+    runError: "Failed to run task."
+  },
+  terminal: {
+    noSessions: "No terminal sessions",
+    ctrlC: "^C",
+    ctrlCTooltip: "Send Ctrl+C (SIGINT) to this agent",
+    stop: "Stop",
+    stopTooltip: "Kill this agent's running process (SIGHUP)",
+    placeholder: "Terminal output will appear here.",
+    agentTitleSuffix: " terminal"
+  },
+  projectSummary: {
+    title: "Project Summary",
+    placeholder: "Describe the workspace here. This is injected at the top of every agent prompt.",
+    save: "Save",
+    saving: "Saving...",
+    cancel: "Cancel",
+    close: "Close",
+    loadError: "Failed to load project summary.",
+    saveError: "Failed to save project summary.",
+    loading: "Loading..."
+  },
+  permissionDialog: {
+    title: "Permission Request",
+    agent: "Agent",
+    tool: "Tool",
+    input: "Input",
+    deny: "Deny",
+    approve: "Approve",
+    morePending: (n: number) => `+ ${n} more pending`
+  }
+};
+
+export type Translations = typeof en;

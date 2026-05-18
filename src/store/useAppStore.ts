@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type {
   Agent,
   AgentHistoryEntry,
+  AgentLocale,
   AgentMode,
   AgentRunRequest,
   AgentRunResult,
@@ -12,6 +13,7 @@ import type {
   Task,
   TaskState
 } from "../types";
+import { detectInitialLocale, setStoredLocale } from "../i18n";
 import { parseToBlocks, type ToBlock } from "../utils/parseToBlocks";
 
 type TaskMode = "manual" | "auto";
@@ -251,6 +253,8 @@ type AppState = {
   pendingDispatches: PendingDispatch[];
   dispatchMode: TaskMode;
   introducedAgents: Set<string>;
+  locale: AgentLocale;
+  setLocale: (locale: AgentLocale) => void;
   loadAll: () => Promise<void>;
   addAgent: (agent: Agent) => Promise<void>;
   updateAgent: (agent: Agent) => Promise<void>;
@@ -281,6 +285,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   pendingDispatches: [],
   dispatchMode: "manual",
   introducedAgents: new Set<string>(),
+  locale: detectInitialLocale(),
+
+  setLocale: (locale) => {
+    setStoredLocale(locale);
+    set({ locale });
+  },
 
   loadAll: async () => {
     if (!listenersRegistered) {
@@ -705,7 +715,8 @@ async function buildContextSnapshot(
         const target = state.nodes.find((node) => node.id === edge.target)?.agentId;
         return { source: source ?? "", target: target ?? "" };
       })
-    }
+    },
+    locale: state.locale
   };
 }
 
