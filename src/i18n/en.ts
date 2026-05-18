@@ -102,7 +102,9 @@ export const en = {
     send: "Send",
     unmatched: "unmatched",
     validation: "Title and body are required.",
-    runError: "Failed to run task."
+    runError: "Failed to run task.",
+    stopTask: "Stop Task",
+    stopTaskTooltip: "Cancel the running task and kill all in-flight agents"
   },
   terminal: {
     noSessions: "No terminal sessions",

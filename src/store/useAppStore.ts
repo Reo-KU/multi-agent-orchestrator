@@ -23,6 +23,7 @@ type PendingDispatch = ToBlock & { id: string; taskId?: string };
 let graphSaveTimer: ReturnType<typeof setTimeout> | undefined;
 let listenersRegistered = false;
 const seenDispatchKeys = new Set<string>();
+const cancelledTaskIds = new Set<string>();
 
 const fallbackMao = {
   agent: {
@@ -33,6 +34,8 @@ const fallbackMao = {
       ok: false,
       error: "window.mao.agent.run is not available."
     }),
+    abort: async (_agentId: string): Promise<boolean> => false,
+    abortAll: async (): Promise<boolean> => false,
     loadSummary: async (_agentId: string): Promise<AgentSummary | null> => null,
     appendHistory: async (_agentId: string, _entry: AgentHistoryEntry): Promise<void> => undefined
   },
@@ -252,6 +255,7 @@ type AppState = {
   logs: Record<string, string[]>;
   pendingDispatches: PendingDispatch[];
   dispatchMode: TaskMode;
+  runningTaskId: string | null;
   introducedAgents: Set<string>;
   locale: AgentLocale;
   setLocale: (locale: AgentLocale) => void;
@@ -272,6 +276,7 @@ type AppState = {
   stopAgent: (agentId: string) => Promise<void>;
   runTask: (input: { title: string; body: string; mode: TaskMode }) => Promise<void>;
   dispatchToAgent: (agentId: string, body: string, pendingId?: string) => Promise<void>;
+  cancelCurrentTask: () => Promise<void>;
 };
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -284,6 +289,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   logs: {},
   pendingDispatches: [],
   dispatchMode: "manual",
+  runningTaskId: null,
   introducedAgents: new Set<string>(),
   locale: detectInitialLocale(),
 
@@ -641,7 +647,15 @@ export const useAppStore = create<AppState>((set, get) => ({
       createdAt: now
     };
 
-    await executeForAgent(rootAgent.id, body, taskState, dispatchMode, set, get);
+    set({ runningTaskId: savedTask.id });
+    try {
+      await executeForAgent(rootAgent.id, body, taskState, dispatchMode, set, get);
+    } finally {
+      set((current) => ({
+        runningTaskId: current.runningTaskId === savedTask.id ? null : current.runningTaskId
+      }));
+      cancelledTaskIds.delete(taskState.taskId);
+    }
   },
 
   dispatchToAgent: async (agentId, body, pendingId) => {
@@ -650,6 +664,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       ? state.pendingDispatches.find((item) => item.id === pendingId)
       : undefined;
     const taskId = pending?.taskId ?? state.tasks[0]?.id;
+    if (taskId && cancelledTaskIds.has(taskId)) {
+      return;
+    }
     if (pendingId) {
       set((state) => ({
         pendingDispatches: state.pendingDispatches.filter((pending) => pending.id !== pendingId)
@@ -667,6 +684,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         status: "running",
         createdAt: now
       };
+      if (cancelledTaskIds.has(orphanTaskState.taskId)) {
+        return;
+      }
       await executeForAgent(agentId, body, orphanTaskState, "manual", set, get);
       return;
     }
@@ -683,6 +703,36 @@ export const useAppStore = create<AppState>((set, get) => ({
     };
 
     await executeForAgent(agentId, body, taskState, state.dispatchMode, set, get);
+  },
+
+  cancelCurrentTask: async () => {
+    const state = get();
+    if (!state.runningTaskId) {
+      return;
+    }
+
+    const taskId = state.runningTaskId;
+    cancelledTaskIds.add(taskId);
+
+    await mao().agent.abortAll().catch((error) => {
+      console.error("Failed to abort agents", error);
+      return false;
+    });
+
+    for (const agent of state.agents.filter((item) => item.status === "running" || item.status === "starting")) {
+      void mao().pty.kill(agent.id).catch((error) => {
+        console.error(`Failed to kill agent ${agent.id}`, error);
+      });
+    }
+
+    const now = new Date().toISOString();
+    set((current) => ({
+      pendingDispatches: [],
+      tasks: current.tasks.map((task) =>
+        task.id === taskId ? { ...task, status: "failed", updatedAt: now } : task
+      ),
+      runningTaskId: null
+    }));
   }
 }));
 
@@ -728,6 +778,10 @@ async function executeForAgent(
   setState: typeof useAppStore.setState,
   getState: typeof useAppStore.getState
 ): Promise<void> {
+  if (cancelledTaskIds.has(taskState.taskId)) {
+    return;
+  }
+
   const state = getState();
   const agent = state.agents.find((item) => item.id === agentId);
   if (!agent) {
@@ -735,12 +789,19 @@ async function executeForAgent(
   }
 
   const context = await buildContextSnapshot(agentId, taskState);
+  if (cancelledTaskIds.has(taskState.taskId)) {
+    return;
+  }
+
   const result = await mao().agent.run({
     agentId,
     body,
     taskId: taskState.taskId,
     context
   });
+  if (cancelledTaskIds.has(taskState.taskId)) {
+    return;
+  }
 
   if (!result.ok) {
     getState().appendLog(agentId, `\n[MAO ERROR] ${result.error}\n`);
@@ -779,11 +840,18 @@ async function executeForAgent(
     return;
   }
 
+  if (cancelledTaskIds.has(taskState.taskId)) {
+    return;
+  }
+
   if (dispatchMode === "auto") {
     await Promise.all(
-      validBlocks.map((block) =>
-        executeForAgent(block.agentId, block.body, taskState, dispatchMode, setState, getState)
-      )
+      validBlocks.map((block) => {
+        if (cancelledTaskIds.has(taskState.taskId)) {
+          return Promise.resolve();
+        }
+        return executeForAgent(block.agentId, block.body, taskState, dispatchMode, setState, getState);
+      })
     );
     return;
   }

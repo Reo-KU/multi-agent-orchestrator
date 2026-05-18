@@ -104,7 +104,9 @@ export const ja: Translations = {
     send: "Send",
     unmatched: "unmatched",
     validation: "Title and body are required.",
-    runError: "Failed to run task."
+    runError: "Failed to run task.",
+    stopTask: "タスク停止",
+    stopTaskTooltip: "実行中のタスクを中止し、全エージェントを kill します"
   },
   terminal: {
     noSessions: "No terminal sessions",

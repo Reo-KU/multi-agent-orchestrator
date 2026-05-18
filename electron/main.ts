@@ -230,6 +230,25 @@ const registerIpcHandlers = (): void => {
   );
 
   ipcMain.handle(
+    "mao:agent:abort" satisfies keyof IpcChannels,
+    async (_event, agentId: string): ReturnType<IpcChannels["mao:agent:abort"]> => {
+      ptyManager.kill(agentId);
+      tmuxManager.kill(agentId);
+      return agentRunner.abort(agentId);
+    }
+  );
+
+  ipcMain.handle(
+    "mao:agent:abortAll" satisfies keyof IpcChannels,
+    async (): ReturnType<IpcChannels["mao:agent:abortAll"]> => {
+      agentRunner.abortAll();
+      ptyManager.killAll();
+      tmuxManager.killAll();
+      return true;
+    }
+  );
+
+  ipcMain.handle(
     "mao:agent:loadSummary" satisfies keyof IpcChannels,
     async (_event, agentId: string): ReturnType<IpcChannels["mao:agent:loadSummary"]> => {
       try {

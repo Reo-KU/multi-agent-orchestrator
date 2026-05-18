@@ -22,6 +22,8 @@ type MaoApi = {
     save: (agent: Agent) => Promise<Agent>;
     delete: (id: string) => Promise<void>;
     run: (request: AgentRunRequest) => Promise<AgentRunResult>;
+    abort: (agentId: string) => Promise<boolean>;
+    abortAll: () => Promise<boolean>;
     loadSummary: (agentId: string) => Promise<AgentSummary | null>;
     appendHistory: (agentId: string, entry: AgentHistoryEntry) => Promise<void>;
   };

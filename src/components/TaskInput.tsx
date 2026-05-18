@@ -7,8 +7,10 @@ export default function TaskInput(): ReactElement {
   const nodes = useAppStore((state) => state.nodes);
   const agents = useAppStore((state) => state.agents);
   const pendingDispatches = useAppStore((state) => state.pendingDispatches);
+  const runningTaskId = useAppStore((state) => state.runningTaskId);
   const runTask = useAppStore((state) => state.runTask);
   const dispatchToAgent = useAppStore((state) => state.dispatchToAgent);
+  const cancelCurrentTask = useAppStore((state) => state.cancelCurrentTask);
   const locale = useAppStore((state) => state.locale);
   const t = getTranslations(locale);
   const [title, setTitle] = useState("");
@@ -69,7 +71,7 @@ export default function TaskInput(): ReactElement {
           </div>
         </div>
 
-        <div className="grid grid-cols-[260px_minmax(0,1fr)_96px] gap-3">
+        <div className="grid grid-cols-[260px_minmax(0,1fr)_128px] gap-3">
           <input
             value={title}
             onChange={(event) => setTitle(event.target.value)}
@@ -82,13 +84,25 @@ export default function TaskInput(): ReactElement {
             className="h-20 resize-none rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm outline-none focus:border-cyan-500"
             placeholder={t.taskInput.detail}
           />
-          <button
-            type="submit"
-            disabled={running || !rootAgent}
-            className="h-20 rounded bg-cyan-500 px-3 py-2 text-sm font-medium text-slate-950 hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {running ? t.taskInput.running : t.taskInput.run}
-          </button>
+          <div className="grid h-20 gap-2">
+            <button
+              type="submit"
+              disabled={running || Boolean(runningTaskId) || !rootAgent}
+              className="rounded bg-cyan-500 px-3 py-2 text-sm font-medium text-slate-950 hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {running || runningTaskId ? t.taskInput.running : t.taskInput.run}
+            </button>
+            {runningTaskId ? (
+              <button
+                type="button"
+                onClick={() => void cancelCurrentTask()}
+                className="rounded bg-red-500 px-3 py-1.5 text-sm font-medium text-red-950 hover:bg-red-400"
+                title={t.taskInput.stopTaskTooltip}
+              >
+                {t.taskInput.stopTask}
+              </button>
+            ) : null}
+          </div>
         </div>
 
         {error ? <p className="text-sm text-red-300">{error}</p> : null}

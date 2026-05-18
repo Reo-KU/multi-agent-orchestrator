@@ -23,6 +23,8 @@ contextBridge.exposeInMainWorld("mao", {
     save: (agent: Agent): Promise<Agent> => ipcRenderer.invoke("mao:agent:save", agent),
     delete: (id: string): Promise<void> => ipcRenderer.invoke("mao:agent:delete", id),
     run: (request: AgentRunRequest): Promise<AgentRunResult> => ipcRenderer.invoke("mao:agent:run", request),
+    abort: (agentId: string): Promise<boolean> => ipcRenderer.invoke("mao:agent:abort", agentId),
+    abortAll: (): Promise<boolean> => ipcRenderer.invoke("mao:agent:abortAll"),
     loadSummary: (agentId: string): Promise<AgentSummary | null> =>
       ipcRenderer.invoke("mao:agent:loadSummary", agentId),
     appendHistory: (agentId: string, entry: AgentHistoryEntry): Promise<void> =>

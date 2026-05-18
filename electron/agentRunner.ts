@@ -374,6 +374,8 @@ export declare interface AgentRunner {
 export class AgentRunner extends EventEmitter {
   private readonly activePtys = new Map<string, pty.IPty>();
   private readonly interactiveBuffers = new Map<string, string>();
+  private readonly activeInteractiveAgents = new Set<string>();
+  private readonly abortedAgents = new Set<string>();
   private ptyBackend: PtyBackend | null = null;
   private isPtyManagerSubscribed = false;
   private mcpPermissionPort = 0;
@@ -496,6 +498,7 @@ export class AgentRunner extends EventEmitter {
 
       proc.onExit(async ({ exitCode }) => {
         this.activePtys.delete(agent.id);
+        this.abortedAgents.delete(agent.id);
         const elapsedMs = Date.now() - startedAt;
         let lastMessage = "";
 
@@ -574,6 +577,7 @@ export class AgentRunner extends EventEmitter {
     const fullPrompt = `${basePrompt}\n\n${signalInstruction}`;
 
     this.interactiveBuffers.set(agent.id, "");
+    this.activeInteractiveAgents.add(agent.id);
     this.emit("status", { agentId: agent.id, status: "running" });
 
     this.ptyBackend.write(agent.id, fullPrompt);
@@ -586,6 +590,9 @@ export class AgentRunner extends EventEmitter {
 
     while (Date.now() - startedAt < timeoutMs) {
       await new Promise((resolve) => setTimeout(resolve, 250));
+      if (this.abortedAgents.has(agent.id)) {
+        break;
+      }
 
       try {
         const content = await fs.readFile(TASK_SIGNALS_PATH, "utf8");
@@ -599,11 +606,18 @@ export class AgentRunner extends EventEmitter {
     }
 
     const elapsedMs = Date.now() - startedAt;
+    const wasAborted = this.abortedAgents.has(agent.id);
+    this.abortedAgents.delete(agent.id);
+    this.activeInteractiveAgents.delete(agent.id);
     const buffer = this.interactiveBuffers.get(agent.id) ?? "";
     this.interactiveBuffers.delete(agent.id);
     this.emit("status", { agentId: agent.id, status: "running" });
 
     if (!signaledAt) {
+      if (wasAborted) {
+        return { ok: false, error: `Aborted by user. Buffer length: ${buffer.length}` };
+      }
+
       return {
         ok: false,
         error: `Timeout waiting for ${signalToken} after ${Math.round(
@@ -643,6 +657,23 @@ export class AgentRunner extends EventEmitter {
     proc.kill();
     this.activePtys.delete(agentId);
     return true;
+  }
+
+  abort(agentId: string): boolean {
+    this.abortedAgents.add(agentId);
+    return this.kill(agentId);
+  }
+
+  abortAll(): void {
+    for (const agentId of this.activePtys.keys()) {
+      this.abortedAgents.add(agentId);
+    }
+
+    for (const agentId of this.activeInteractiveAgents.values()) {
+      this.abortedAgents.add(agentId);
+    }
+
+    this.killAll();
   }
 
   killAll(): void {
